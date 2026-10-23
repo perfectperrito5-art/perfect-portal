@@ -1,0 +1,24 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<form method="post" class="form-grid">
+  {{ form.hidden_tag() }}
+  <label>Name {{ form.name() }}</label>
+  <label>Description {{ form.description(rows=3) }}</label>
+  <label>Price (TZS) {{ form.price_tzs() }}</label>
+  <label>Duration
+    <span class="duration-row">
+      {{ form.duration_amount() }}
+      {{ form.duration_unit() }}
+    </span>
+    <span class="muted">A 24-hour package is <strong>24 + Hours</strong> (not 24 minutes).</span>
+  </label>
+  <label>Sort order {{ form.sort_order() }}</label>
+  <label class="check">{{ form.is_active() }} Active</label>
+  <div class="form-actions">
+    <button type="submit" class="btn">{{ form.submit.label.text }}</button>
+    <a href="{{ url_for('admin.packages') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

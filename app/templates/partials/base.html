@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="{{ theme.primary_color }}">
+  <title>{% block title %}{{ theme.brand_name }}{% endblock %}</title>
+  {# Absolute portal URL — survives DNS switch after Wi‑Fi unlock #}
+  {% set asset_root = portal_base if portal_base else '' %}
+  <link rel="stylesheet" href="{{ asset_root }}{{ url_for('static', filename='css/portal.css') }}">
+  <style>
+    :root {
+      --brand-primary: {{ theme.primary_color }};
+      --brand-accent: {{ theme.accent_color }};
+      --brand-text: {{ theme.text_color }};
+      --brand-muted: {{ theme.muted_color }};
+      --brand-surface: {{ theme.surface_color }};
+      {% if theme.background_type == 'image' and theme.background_image %}
+      --brand-bg: url('{{ asset_root }}{{ url_for('static', filename=theme.background_image) }}') center/cover no-repeat fixed;
+      {% elif theme.background_type == 'solid' %}
+      --brand-bg: {{ theme.background_value }};
+      {% else %}
+      --brand-bg: {{ theme.background_value }};
+      {% endif %}
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <div class="atmosphere" aria-hidden="true"></div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-stack" role="status">
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+  {% block body %}{% endblock %}
+  <script src="{{ asset_root }}{{ url_for('static', filename='js/portal.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

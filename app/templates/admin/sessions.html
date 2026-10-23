@@ -1,0 +1,32 @@
+{% extends "admin/layout.html" %}
+{% block title %}Sessions{% endblock %}
+{% block content %}
+<h1>Access sessions</h1>
+<table>
+  <thead>
+    <tr><th>MAC</th><th>Package</th><th>Started</th><th>Expires</th><th>Active</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for s in sessions %}
+    <tr>
+      <td><code>{{ s.mac_address }}</code></td>
+      <td>{{ s.package.name if s.package else '—' }}</td>
+      <td>{{ format_local(s.started_at) }}</td>
+      <td>{{ format_local(s.expires_at) }}{% if s.is_active() %} <span class="muted">{{ remaining_label(s) }}</span>{% endif %}</td>
+      <td>{{ 'Yes' if s.is_active() else 'No' }}</td>
+      <td>
+        {% if s.is_active() %}
+        <form method="post" action="{{ url_for('admin.session_revoke', session_id=s.id) }}"
+              onsubmit="return confirm('Cut internet for this device now?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="linkish">Revoke &amp; cut Wi‑Fi</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">No sessions yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

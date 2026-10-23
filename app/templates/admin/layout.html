@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Admin{% endblock %} · {{ theme.brand_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body>
+  <div class="admin-app">
+    <aside class="sidebar">
+      <div class="sidebar-brand">{{ theme.brand_name }}</div>
+      <nav>
+        <a href="{{ url_for('admin.dashboard') }}" class="{% if request.endpoint == 'admin.dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('admin.packages') }}" class="{% if 'package' in request.endpoint %}active{% endif %}">Packages</a>
+        <a href="{{ url_for('admin.vouchers') }}" class="{% if 'voucher' in request.endpoint %}active{% endif %}">Vouchers</a>
+        <a href="{{ url_for('admin.payments') }}" class="{% if 'payment' in request.endpoint %}active{% endif %}">Payments</a>
+        <a href="{{ url_for('admin.sessions') }}" class="{% if 'session' in request.endpoint %}active{% endif %}">Sessions</a>
+        <a href="{{ url_for('admin.appearance') }}" class="{% if request.endpoint == 'admin.appearance' %}active{% endif %}">Appearance</a>
+        <a href="{{ url_for('admin.security') }}" class="{% if request.endpoint == 'admin.security' %}active{% endif %}">Security</a>
+        <a href="{{ url_for('portal.home') }}" target="_blank" rel="noopener">Open portal ↗</a>
+      </nav>
+      <form method="post" action="{{ url_for('auth.logout') }}" class="logout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">Sign out</button>
+      </form>
+    </aside>
+    <main class="admin-main">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">
+            {% for category, message in messages %}
+              <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

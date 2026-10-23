@@ -1,0 +1,207 @@
+{% extends "partials/base.html" %}
+{% block title %}{{ theme.brand_name }} · Connect{% endblock %}
+{% block body_class %}page-home{% endblock %}
+
+{% block body %}
+<main class="shell">
+  <header class="brand-block">
+    {% if theme.logo_path %}
+      <img class="brand-logo" src="{{ url_for('static', filename=theme.logo_path) }}" alt="{{ theme.brand_name }}">
+    {% endif %}
+    <p class="brand-name">{{ theme.brand_name }}</p>
+    {% if theme.tagline %}<p class="brand-tag">{{ theme.tagline }}</p>{% endif %}
+  </header>
+
+  <section class="hero">
+    <h1>{{ theme.hero_title }}</h1>
+    <p>{{ theme.hero_subtitle }}</p>
+  </section>
+
+  {% if active_session %}
+  <section class="panel panel-live" aria-live="polite">
+    <h2>You're online</h2>
+    <p>Package <strong>{{ active_session.package.name }}</strong>
+      ({{ active_session.package.duration_label() }})</p>
+    <p class="hint">Expires
+      <time datetime="{{ active_session.expires_at.isoformat() }}">{{ format_local(active_session.expires_at) }}</time>
+      · {{ remaining_label(active_session) }}
+    </p>
+  </section>
+  {% else %}
+
+  <section class="panel">
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab is-active" data-tab="packages" role="tab" aria-selected="true">Packages</button>
+      {% if theme.show_voucher_tab == '1' %}
+      <button type="button" class="tab" data-tab="voucher" role="tab" aria-selected="false">Voucher</button>
+      {% endif %}
+    </div>
+
+    <div class="tab-panel is-active" id="tab-packages" role="tabpanel">
+      <div class="packages-scroll" {% if packages|length > 3 %}data-scrollable="1"{% endif %}>
+        <ul class="package-list">
+          {% for pkg in packages %}
+          <li>
+            <label class="package-card">
+              <input type="radio" name="package_pick" value="{{ pkg.id }}"
+                     data-name="{{ pkg.name }}"
+                     data-price="{{ pkg.price_tzs }}"
+                     data-duration="{{ pkg.duration_label() }}"
+                     {% if loop.first %}checked{% endif %}>
+              <span class="package-body">
+                <span class="package-name">{{ pkg.name }}</span>
+                <span class="package-meta">{{ pkg.duration_label() }} · {{ '{:,}'.format(pkg.price_tzs) }} TZS</span>
+                {% if pkg.description %}<span class="package-desc">{{ pkg.description }}</span>{% endif %}
+              </span>
+            </label>
+          </li>
+          {% else %}
+          <li class="empty">No packages yet. Ask the admin to add some.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      {% if packages %}
+      <aside class="howto howto-dock" id="howto-pay"
+             data-has-pay="{{ theme.business_pay_number or '' }}"
+             data-has-support="{{ theme.support_phone or '' }}">
+        <p class="howto-kicker">How to get online</p>
+        <p class="howto-kicker-sw">Jinsi ya kuingia</p>
+        <p class="howto-pick">
+          Umechagua:
+          <strong id="howto-pkg-name">—</strong>
+          · <span id="howto-pkg-meta">—</span>
+        </p>
+
+        <ol class="howto-steps">
+          <li>
+            <span class="step-n">1</span>
+            <span>
+              Lipa
+              <strong id="howto-amount">—</strong>
+              kwenye namba
+              {% if theme.business_pay_number %}
+                <strong class="mono">{{ theme.business_pay_number }}</strong>
+                {% if theme.business_pay_name %}
+                  <span class="soft">({{ theme.business_pay_name }})</span>
+                {% endif %}
+              {% else %}
+                <span class="soft">utakayoonyeshwa</span>
+              {% endif %}.
+            </span>
+          </li>
+          <li>
+            <span class="step-n">2</span>
+            <span>
+              {% if theme.support_phone %}
+                Piga simu
+                <a class="phone-link" href="tel:{{ theme.support_phone }}">{{ theme.support_phone }}</a>
+                (bora), pia tuma ujumbe wa malipo (SMS / WhatsApp).
+              {% else %}
+                Piga simu mhudumu (bora), pia tuma ujumbe wa malipo.
+              {% endif %}
+            </span>
+          </li>
+          <li>
+            <span class="step-n">3</span>
+            <span>Watakupa <strong>kodi ya voucher</strong>.</span>
+          </li>
+          <li>
+            <span class="step-n">4</span>
+            <span>Fungua <strong>Voucher</strong>, weka kodi, bonyeza <strong>Redeem &amp; connect</strong>.</span>
+          </li>
+        </ol>
+
+        {% if theme.show_voucher_tab == '1' %}
+        <button type="button" class="btn btn-primary" id="goto-voucher">
+          Nina voucher — fungua
+        </button>
+        {% endif %}
+      </aside>
+      {% endif %}
+
+      {% if packages and theme.show_online_pay == '1' %}
+      <details class="online-pay">
+        <summary>Online pay (optional)</summary>
+        <form class="pay-form" method="post" action="{{ url_for('portal.pay') }}" id="pay-form">
+          {{ pay_form.hidden_tag() }}
+          {{ pay_form.package_id(id='package_id') }}
+          {{ pay_form.mac() }}
+          <label class="field">
+            <span>Mobile money number</span>
+            {{ pay_form.phone(placeholder='0754XXXXXX', autocomplete='tel', inputmode='tel') }}
+            <small class="hint" id="network-hint">Yas · Vodacom · Airtel — PIN opens on your phone</small>
+          </label>
+          <button type="submit" class="btn btn-secondary" id="pay-btn">Pay now</button>
+        </form>
+      </details>
+      {% else %}
+        {# Keep package_id for JS if online pay hidden #}
+        <input type="hidden" id="package_id" name="package_id" value="">
+      {% endif %}
+    </div>
+
+    {% if theme.show_voucher_tab == '1' %}
+    <div class="tab-panel" id="tab-voucher" role="tabpanel" hidden>
+      <p class="voucher-lead">Enter the code from the attendant after you pay.</p>
+      <form class="voucher-form" method="post" action="/redeem">
+        {{ voucher_form.hidden_tag() }}
+        {{ voucher_form.mac() }}
+        <label class="field">
+          <span>Voucher code</span>
+          {{ voucher_form.code(placeholder='XXXX-XXXX-XX', autocomplete='off', spellcheck='false') }}
+        </label>
+        <button type="submit" class="btn btn-primary">Redeem &amp; connect</button>
+      </form>
+      <p class="mac-note">Tip: turn off randomized / private MAC for this Wi‑Fi so reconnect stays easy.</p>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <footer class="site-foot">
+    <p>{{ theme.footer_text }}</p>
+    {% if theme.support_phone %}<p>Support: {{ theme.support_phone }}</p>{% endif %}
+  </footer>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const packageId = document.getElementById('package_id');
+    const radios = document.querySelectorAll('input[name="package_pick"]');
+    const nameEl = document.getElementById('howto-pkg-name');
+    const metaEl = document.getElementById('howto-pkg-meta');
+    const amountEl = document.getElementById('howto-amount');
+    const gotoVoucher = document.getElementById('goto-voucher');
+
+    const fmt = (n) => {
+      try { return Number(n).toLocaleString('en-US'); } catch (_) { return n; }
+    };
+
+    const sync = () => {
+      const selected = document.querySelector('input[name="package_pick"]:checked');
+      if (!selected) return;
+      if (packageId) packageId.value = selected.value;
+      const name = selected.dataset.name || 'Package';
+      const price = selected.dataset.price || '0';
+      const duration = selected.dataset.duration || '';
+      if (nameEl) nameEl.textContent = name;
+      if (metaEl) metaEl.textContent = duration + ' · ' + fmt(price) + ' TZS';
+      if (amountEl) amountEl.textContent = fmt(price) + ' TZS';
+    };
+    radios.forEach(r => r.addEventListener('change', sync));
+    sync();
+
+    if (gotoVoucher) {
+      gotoVoucher.addEventListener('click', () => {
+        const tab = document.querySelector('.tab[data-tab="voucher"]');
+        if (tab) tab.click();
+        const code = document.querySelector('#tab-voucher input[name="code"]');
+        if (code) code.focus();
+      });
+    }
+  });
+</script>
+{% endblock %}

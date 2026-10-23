@@ -1,0 +1,41 @@
+{% extends "admin/layout.html" %}
+{% block title %}Packages{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Packages</h1>
+    <p class="lede">Price + time online. Create, edit, or deactivate anytime.</p>
+  </div>
+  <a class="btn" href="{{ url_for('admin.package_new') }}">New package</a>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Name</th><th>Price</th><th>Duration</th><th>Active</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in packages %}
+    <tr>
+      <td>
+        <strong>{{ p.name }}</strong>
+        {% if p.description %}<div class="muted">{{ p.description }}</div>{% endif %}
+      </td>
+      <td>{{ '{:,}'.format(p.price_tzs) }} TZS</td>
+      <td>{{ p.duration_label() }} <span class="muted">({{ p.duration_minutes }} min)</span></td>
+      <td>{{ 'Yes' if p.is_active else 'No' }}</td>
+      <td class="actions">
+        <a href="{{ url_for('admin.package_edit', package_id=p.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('admin.package_delete', package_id=p.id) }}" onsubmit="return confirm('Remove or deactivate this package?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="linkish">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">No packages yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

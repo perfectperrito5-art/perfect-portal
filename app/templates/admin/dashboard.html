@@ -1,0 +1,36 @@
+{% extends "admin/layout.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<p class="lede">Overview of your captive Wi‑Fi portal.</p>
+
+<div class="stat-grid">
+  <div class="stat"><span>{{ stats.active_packages }}</span><label>Active packages</label></div>
+  <div class="stat"><span>{{ stats.vouchers_unused }}</span><label>Unused vouchers</label></div>
+  <div class="stat"><span>{{ stats.payments_today }}</span><label>Payments today</label></div>
+  <div class="stat"><span>{{ stats.payments_success }}</span><label>Paid total</label></div>
+  <div class="stat"><span>{{ stats.active_sessions }}</span><label>Online now</label></div>
+</div>
+
+<section class="card">
+  <h2>Recent payments</h2>
+  <table>
+    <thead>
+      <tr><th>Order</th><th>Phone</th><th>Amount</th><th>Status</th><th>When</th></tr>
+    </thead>
+    <tbody>
+      {% for p in recent_payments %}
+      <tr>
+        <td>{{ p.order_id }}</td>
+        <td>{{ p.phone }}</td>
+        <td>{{ '{:,}'.format(p.amount_tzs) }}</td>
+        <td><span class="badge badge-{{ p.status }}">{{ p.status }}</span></td>
+        <td>{{ p.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">No payments yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

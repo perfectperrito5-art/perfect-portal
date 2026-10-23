@@ -1,0 +1,15 @@
+.env
+router.jpeg
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+instance/
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+gateway/gateway.log
+gateway/runtime/
+.pytest_cache/
+.mypy_cache/
+*.db

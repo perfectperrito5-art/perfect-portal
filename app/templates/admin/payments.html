@@ -1,0 +1,33 @@
+{% extends "admin/layout.html" %}
+{% block title %}Payments{% endblock %}
+{% block content %}
+<h1>Payments</h1>
+<p class="lede">Selcom USSD push transactions. Mark paid only for verified offline settlements.</p>
+<table>
+  <thead>
+    <tr><th>Order</th><th>Phone</th><th>Package</th><th>Amount</th><th>Status</th><th>Message</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for p in payments %}
+    <tr>
+      <td>{{ p.order_id }}</td>
+      <td>{{ p.phone }}</td>
+      <td>{{ p.package.name if p.package else '—' }}</td>
+      <td>{{ '{:,}'.format(p.amount_tzs) }}</td>
+      <td><span class="badge badge-{{ p.status }}">{{ p.status }}</span></td>
+      <td class="muted">{{ p.selcom_message or '—' }}</td>
+      <td>
+        {% if p.status != 'success' %}
+        <form method="post" action="{{ url_for('admin.payment_mark_paid', payment_id=p.id) }}" onsubmit="return confirm('Grant access for this payment?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="linkish">Mark paid</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">No payments yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

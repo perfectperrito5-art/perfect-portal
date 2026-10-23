@@ -1,0 +1,42 @@
+{% extends "admin/layout.html" %}
+{% block title %}Appearance{% endblock %}
+{% block content %}
+<h1>Appearance</h1>
+<p class="lede">Brand look, and the payment / support numbers customers see.</p>
+
+<form method="post" enctype="multipart/form-data" class="form-grid">
+  {{ form.hidden_tag() }}
+  <label>Brand name {{ form.brand_name() }}</label>
+  <label>Tagline {{ form.tagline() }}</label>
+  <label>Business payment number {{ form.business_pay_number(placeholder='e.g. 07XXXXXXXX or Till') }}
+    <span class="muted">Shown in step 1 — where customers send mobile money</span>
+  </label>
+  <label>Business name (optional) {{ form.business_pay_name(placeholder='e.g. Perfect Hotspot') }}</label>
+  <label>Supporter phone {{ form.support_phone(placeholder='e.g. 07XXXXXXXX') }}
+    <span class="muted">Shown in step 2 — call + SMS / WhatsApp after paying</span>
+  </label>
+  <label>Hero title {{ form.hero_title() }}</label>
+  <label>Hero subtitle {{ form.hero_subtitle(rows=2) }}</label>
+  <label>Primary color {{ form.primary_color(type='color') }}</label>
+  <label>Accent color {{ form.accent_color(type='color') }}</label>
+  <label>Text color {{ form.text_color(type='color') }}</label>
+  <label>Muted color {{ form.muted_color(type='color') }}</label>
+  <label>Surface color {{ form.surface_color() }}</label>
+  <label>Background type {{ form.background_type() }}</label>
+  <label>Background value (CSS) {{ form.background_value(rows=2) }}
+    <span class="muted">For gradient/solid. Example: linear-gradient(160deg, #0B4F4A, #1C1917)</span>
+  </label>
+  <label>Background image {{ form.background_image_file() }}
+    {% if theme.background_image %}<span class="muted">Current: {{ theme.background_image }}</span>{% endif %}
+  </label>
+  <label>Logo {{ form.logo_file() }}
+    {% if theme.logo_path %}<span class="muted">Current: {{ theme.logo_path }}</span>{% endif %}
+  </label>
+  <label>Footer text {{ form.footer_text() }}</label>
+  <label class="check">{{ form.show_voucher_tab() }} Show voucher tab on portal</label>
+  <label class="check">{{ form.show_online_pay() }} Show online Azampay (off until ready)</label>
+  <div class="form-actions">
+    <button type="submit" class="btn">{{ form.submit.label.text }}</button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "admin/layout.html" %}
+{% block title %}Security{% endblock %}
+{% block content %}
+<h1>Security</h1>
+<p class="lede">Change your admin password. Use a long unique passphrase.</p>
+<form method="post" class="form-grid narrow">
+  {{ form.hidden_tag() }}
+  <label>Current password {{ form.current_password() }}</label>
+  <label>New password {{ form.new_password() }}</label>
+  <label>Confirm {{ form.confirm_password() }}</label>
+  <button type="submit" class="btn">{{ form.submit.label.text }}</button>
+</form>
+{% endblock %}

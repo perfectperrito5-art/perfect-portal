@@ -1,0 +1,19 @@
+{% extends "partials/base.html" %}
+{% block title %}Session · {{ theme.brand_name }}{% endblock %}
+
+{% block body %}
+<main class="shell narrow">
+  <section class="panel">
+    <h1>Your session</h1>
+    {% if active_session %}
+      <p>Package: <strong>{{ active_session.package.name }}</strong></p>
+      <p>Expires: {{ format_local(active_session.expires_at) }}
+        ({{ remaining_label(active_session) }})</p>
+      {% if client_mac %}<p class="hint">Device: {{ client_mac }}</p>{% endif %}
+    {% else %}
+      <p>No active session on this device.</p>
+      <a class="btn btn-primary" href="{{ url_for('portal.home') }}">Get access</a>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}

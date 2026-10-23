@@ -1,0 +1,21 @@
+{% extends "partials/base.html" %}
+{% block title %}Connected · {{ theme.brand_name }}{% endblock %}
+
+{% block body %}
+<main class="shell narrow">
+  <section class="panel success-panel">
+    <h1>You're connected</h1>
+    <p>
+      {{ payment.package.name }} is active
+      ({{ payment.package.duration_label() }}).
+    </p>
+    <p class="hint connected-hint">
+      On your phone’s Wi‑Fi sign-in screen, choose
+      <strong>Use this network</strong>
+      if you see it (or <strong>Do not use this network</strong> if you want to leave).
+    </p>
+    <a class="btn btn-primary" href="{{ portal_base }}/">Done</a>
+    <a class="btn btn-ghost" href="{{ portal_base }}/status">View session</a>
+  </section>
+</main>
+{% endblock %}

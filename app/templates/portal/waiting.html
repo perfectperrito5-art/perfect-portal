@@ -1,0 +1,41 @@
+{% extends "partials/base.html" %}
+{% block title %}Confirm on phone · {{ theme.brand_name }}{% endblock %}
+
+{% block body %}
+<main class="shell narrow">
+  <header class="brand-block compact">
+    <p class="brand-name">{{ theme.brand_name }}</p>
+  </header>
+
+  <section class="panel waiting-panel" data-order-id="{{ payment.order_id }}" data-status-url="{{ url_for('api.payment_status', order_id=payment.order_id) }}" data-success-url="{{ url_for('portal.success', order_id=payment.order_id) }}">
+    <div class="pulse" aria-hidden="true"></div>
+    <h1>Check your phone</h1>
+    <p class="lead">
+      A <strong>{{ network }}</strong> payment prompt was sent to
+      <strong>{{ phone_display }}</strong>.
+    </p>
+    <p>Enter your mobile money PIN on the phone prompt — never type your PIN here.</p>
+
+    <dl class="meta-grid">
+      <div>
+        <dt>Amount</dt>
+        <dd>{{ '{:,}'.format(payment.amount_tzs) }} TZS</dd>
+      </div>
+      <div>
+        <dt>Package</dt>
+        <dd>{{ payment.package.name }} · {{ payment.package.duration_label() }}</dd>
+      </div>
+      <div>
+        <dt>Status</dt>
+        <dd id="pay-status">{{ payment.status }}</dd>
+      </div>
+    </dl>
+
+    {% if payment.status == 'pending' and 'not configured' in (payment.selcom_message or '')|lower %}
+    <p class="hint warn">Selcom API keys are not set yet. In admin you can mark a payment paid for testing, or redeem a voucher.</p>
+    {% endif %}
+
+    <a class="btn btn-ghost" href="{{ url_for('portal.home') }}">Back</a>
+  </section>
+</main>
+{% endblock %}

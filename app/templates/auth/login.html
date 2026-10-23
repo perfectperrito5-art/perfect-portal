@@ -1,0 +1,23 @@
+{% extends "partials/base.html" %}
+{% block title %}Admin sign in · {{ theme.brand_name }}{% endblock %}
+
+{% block body %}
+<main class="shell narrow">
+  <section class="panel">
+    <h1>Admin</h1>
+    <p class="hint">Superuser access for packages, vouchers, and appearance.</p>
+    <form method="post" class="stack-form">
+      {{ form.hidden_tag() }}
+      <label class="field">
+        <span>Username</span>
+        {{ form.username(autocomplete='username') }}
+      </label>
+      <label class="field">
+        <span>Password</span>
+        {{ form.password(autocomplete='current-password') }}
+      </label>
+      <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+    </form>
+  </section>
+</main>
+{% endblock %}

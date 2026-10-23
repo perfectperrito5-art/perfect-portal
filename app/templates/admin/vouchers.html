@@ -1,0 +1,55 @@
+{% extends "admin/layout.html" %}
+{% block title %}Vouchers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Vouchers</h1>
+    <p class="lede">Sell offline, gift access, or use as a fallback when USSD is delayed.</p>
+  </div>
+</div>
+
+<section class="card">
+  <h2>Generate batch</h2>
+  <form method="post" class="form-inline">
+    {{ form.hidden_tag() }}
+    <label>Package {{ form.package_id() }}</label>
+    <label>Count {{ form.count() }}</label>
+    <label>Expires (days) {{ form.expires_days() }}</label>
+    <label>Note {{ form.note() }}</label>
+    <button type="submit" class="btn">{{ form.submit.label.text }}</button>
+  </form>
+</section>
+
+<div class="filters">
+  <a href="?status=unused" class="{% if status=='unused' %}active{% endif %}">Unused</a>
+  <a href="?status=used" class="{% if status=='used' %}active{% endif %}">Used</a>
+  <a href="?status=revoked" class="{% if status=='revoked' %}active{% endif %}">Revoked</a>
+  <a href="?status=all" class="{% if status=='all' %}active{% endif %}">All</a>
+</div>
+
+<table>
+  <thead>
+    <tr><th>Code</th><th>Package</th><th>Status</th><th>Created</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for v in vouchers %}
+    <tr>
+      <td><code>{{ v.code }}</code></td>
+      <td>{{ v.package.name if v.package else '—' }}</td>
+      <td><span class="badge badge-{{ v.status }}">{{ v.status }}</span></td>
+      <td>{{ v.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td>
+        {% if v.status == 'unused' %}
+        <form method="post" action="{{ url_for('admin.voucher_revoke', voucher_id=v.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="linkish">Revoke</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">No vouchers in this filter.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
