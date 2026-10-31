@@ -15,6 +15,10 @@ def _utcnow():
     return datetime.now(timezone.utc)
 
 
+def _aware(value):
+    return value.replace(tzinfo=timezone.utc) if value and value.tzinfo is None else value
+
+
 def _hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -90,7 +94,7 @@ def link_device_with_code(code: str, mac_address: str, ip_address: str = ""):
         raise ValueError("Enter a valid six-digit linking code.")
     now = _utcnow()
     row = DeviceLinkCode.query.filter_by(code_hash=_hash(code)).with_for_update().first()
-    if not row or row.used_at or row.expires_at <= now:
+    if not row or row.used_at or _aware(row.expires_at) <= now:
         raise ValueError("That linking code is invalid or has expired.")
     account = db.session.get(CustomerAccount, row.account_id)
     if not account or not account.is_active:
@@ -104,7 +108,7 @@ def link_device_with_code(code: str, mac_address: str, ip_address: str = ""):
         # A fresh visit auto-creates a temporary account for an unrecognised MAC.
         # It may be absorbed only while empty and within 15 minutes of creation.
         placeholder = existing.account
-        fresh = (now - placeholder.created_at.replace(tzinfo=timezone.utc)) <= timedelta(minutes=15)
+        fresh = (now - _aware(placeholder.created_at)) <= timedelta(minutes=15)
         has_wallet = WalletTransaction.query.filter_by(account_id=placeholder.id).first()
         has_other_devices = CustomerDevice.query.filter(
             CustomerDevice.account_id == placeholder.id,
