@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models.customer import (
-    CustomerAccount, CustomerActivity, CustomerDevice, DeviceLinkCode,
+    CustomerAccount, CustomerActivity, CustomerDevice, DeviceLinkCode, WalletTransaction,
 )
 
 
@@ -101,11 +101,28 @@ def link_device_with_code(code: str, mac_address: str, ip_address: str = ""):
             row.used_at = now
             db.session.commit()
             return account, existing
-        raise ValueError("This device is already linked to another account.")
-    device = CustomerDevice(
-        account_id=account.id, mac_address=normalized,
-        last_ip_address=ip_address or None,
-    )
+        # A fresh visit auto-creates a temporary account for an unrecognised MAC.
+        # It may be absorbed only while empty and within 15 minutes of creation.
+        placeholder = existing.account
+        fresh = (now - placeholder.created_at.replace(tzinfo=timezone.utc)) <= timedelta(minutes=15)
+        has_wallet = WalletTransaction.query.filter_by(account_id=placeholder.id).first()
+        has_other_devices = CustomerDevice.query.filter(
+            CustomerDevice.account_id == placeholder.id,
+            CustomerDevice.id != existing.id,
+        ).first()
+        if not fresh or has_wallet or has_other_devices:
+            raise ValueError("This device is already linked to another account.")
+        existing.account_id = account.id
+        existing.last_ip_address = ip_address or existing.last_ip_address
+        existing.last_seen_at = now
+        db.session.delete(placeholder)
+        device = existing
+    else:
+        device = CustomerDevice(
+            account_id=account.id, mac_address=normalized,
+            last_ip_address=ip_address or None,
+        )
+        db.session.add(device)
     row.used_at = now
     db.session.add(device)
     db.session.flush()
