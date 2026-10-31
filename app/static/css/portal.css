@@ -587,3 +587,22 @@ body {
     border-radius: 18px;
   }
 }
+
+/* Customer account summary */
+.account-panel { margin-bottom: 1.25rem; padding: 1rem 1.1rem; }
+.account-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+.account-label { display:block; color:var(--brand-muted); font-size:.78rem; }
+.account-username { display:block; font-size:1.05rem; }
+.account-edit summary,.account-devices summary { cursor:pointer; color:var(--brand-primary); font-size:.88rem; font-weight:700; }
+.account-edit form { min-width: min(260px, 70vw); padding-top:.7rem; }
+.account-meta { display:grid; gap:.55rem; margin:.85rem 0; }
+.account-meta dt { color:var(--brand-muted); font-size:.75rem; }
+.account-meta dd { margin:0; font-size:.88rem; font-weight:600; overflow-wrap:anywhere; }
+.reveal-value { border:0; background:transparent; color:var(--brand-primary); font:inherit; font-size:.78rem; cursor:pointer; margin-left:.35rem; }
+.device-list { display:grid; gap:.5rem; margin:.7rem 0; }
+.device-row { display:flex; justify-content:space-between; gap:.75rem; font-size:.78rem; overflow-wrap:anywhere; }
+.device-row > span:last-child { text-align:right; }
+.account-devices > form { margin-top:.65rem; }
+.account-devices .btn-ghost { margin-top:0; }
+.link-device-form { padding-top:.6rem; border-top:1px solid rgba(15,23,42,.08); }
+
