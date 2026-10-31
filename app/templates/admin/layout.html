@@ -12,6 +12,7 @@
       <div class="sidebar-brand">{{ theme.brand_name }}</div>
       <nav>
         <a href="{{ url_for('admin.dashboard') }}" class="{% if request.endpoint == 'admin.dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('admin.customers') }}" class="{% if 'customer' in request.endpoint %}active{% endif %}">Customers</a>
         <a href="{{ url_for('admin.packages') }}" class="{% if 'package' in request.endpoint %}active{% endif %}">Packages</a>
         <a href="{{ url_for('admin.vouchers') }}" class="{% if 'voucher' in request.endpoint %}active{% endif %}">Vouchers</a>
         <a href="{{ url_for('admin.payments') }}" class="{% if 'payment' in request.endpoint %}active{% endif %}">Payments</a>
