@@ -33,6 +33,7 @@ from app.models.package import Package
 from app.models.payment import Payment
 from app.models.session import AccessSession
 from app.models.voucher import Voucher
+from app.models.customer import CustomerAccount, CustomerDevice, CustomerActivity, WalletTransaction
 from app.services.access import revoke_expired_sessions, revoke_session
 from app.services.clock import duration_to_minutes, minutes_to_amount_unit
 from app.services.payments import fulfill_payment
@@ -186,6 +187,35 @@ def dashboard():
     )
     return render_template(
         "admin/dashboard.html", stats=stats, recent_payments=recent_payments
+    )
+
+
+@bp.route("/customers")
+@login_required
+def customers():
+    page = max(1, request.args.get("page", 1, type=int))
+    accounts = CustomerAccount.query.order_by(CustomerAccount.created_at.desc()).paginate(
+        page=page, per_page=30, error_out=False
+    )
+    return render_template("admin/customers.html", accounts=accounts)
+
+
+@bp.route("/customers/<int:account_id>")
+@login_required
+def customer_detail(account_id: int):
+    account = CustomerAccount.query.get_or_404(account_id)
+    devices = CustomerDevice.query.filter_by(account_id=account.id).order_by(
+        CustomerDevice.last_seen_at.desc()
+    ).all()
+    activities = CustomerActivity.query.filter_by(account_id=account.id).order_by(
+        CustomerActivity.created_at.desc()
+    ).limit(50).all()
+    transactions = WalletTransaction.query.filter_by(account_id=account.id).order_by(
+        WalletTransaction.created_at.desc()
+    ).limit(50).all()
+    return render_template(
+        "admin/customer_detail.html", account=account, devices=devices,
+        activities=activities, transactions=transactions,
     )
 
 
