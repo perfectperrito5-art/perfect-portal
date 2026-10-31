@@ -12,6 +12,54 @@
     {% if theme.tagline %}<p class="brand-tag">{{ theme.tagline }}</p>{% endif %}
   </header>
 
+  {% if customer_account and customer_device %}
+  <section class="panel account-panel">
+    <div class="account-heading">
+      <div>
+        <span class="account-label">Your account</span>
+        <strong class="account-username">{{ customer_account.username }}</strong>
+      </div>
+      <details class="account-edit">
+        <summary aria-label="Edit username">Edit</summary>
+        <form method="post" action="{{ url_for('portal.update_customer_username') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="field"><span>Username</span><input name="username" value="{{ customer_account.username }}" minlength="3" maxlength="24" pattern="[A-Za-z0-9]+" required></label>
+          <button class="btn btn-primary" type="submit">Save</button>
+        </form>
+      </details>
+    </div>
+    <dl class="account-meta">
+      <div><dt>MAC address</dt><dd>{{ customer_device.mac_address }}</dd></div>
+      <div>
+        <dt>IP address</dt>
+        <dd><span class="private-value" data-private-value="{{ customer_device.last_ip_address or 'Not available' }}">••••••••</span>
+          <button class="reveal-value" type="button" aria-label="Show IP address">Show</button></dd>
+      </div>
+    </dl>
+    <details class="account-devices">
+      <summary>Devices</summary>
+      <div class="device-list">
+        {% for device in customer_account.devices.filter_by(is_active=True).all() %}
+        <div class="device-row">
+          <span>{{ device.mac_address }}</span>
+          <span><span class="private-value" data-private-value="{{ device.last_ip_address or 'Not available' }}">••••••••</span>
+            <button class="reveal-value" type="button" aria-label="Show device IP">Show</button></span>
+        </div>
+        {% endfor %}
+      </div>
+      <form method="post" action="{{ url_for('portal.customer_link_code') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-ghost" type="submit">Generate device-link code</button>
+      </form>
+      <form method="post" action="{{ url_for('portal.customer_link_device') }}" class="link-device-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field"><span>Link this device with a code</span><input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code" required></label>
+        <button class="btn btn-primary" type="submit">Link device</button>
+      </form>
+    </details>
+  </section>
+  {% endif %}
+
   <section class="hero">
     <h1>{{ theme.hero_title }}</h1>
     <p>{{ theme.hero_subtitle }}</p>
@@ -167,6 +215,18 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+document.addEventListener("click", (event) => {
+  const button = event.target.closest(".reveal-value");
+  if (!button) return;
+  const value = button.parentElement.querySelector(".private-value");
+  if (!value) return;
+  const shown = button.dataset.shown === "1";
+  value.textContent = shown ? "••••••••" : value.dataset.privateValue;
+  button.dataset.shown = shown ? "0" : "1";
+  button.textContent = shown ? "Show" : "Hide";
+});
+</script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const packageId = document.getElementById('package_id');
