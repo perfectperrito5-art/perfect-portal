@@ -1,0 +1,35 @@
+{% extends "admin/layout.html" %}
+{% block title %}Customers{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div><p class="eyebrow">Accounts</p><h1>Customers</h1><p>Automatically created portal accounts and their registered devices.</p></div>
+</header>
+<section class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Username</th><th>Devices</th><th>Token balance</th><th>Status</th><th>Created</th><th></th></tr></thead>
+      <tbody>
+      {% for account in accounts.items %}
+        <tr>
+          <td><strong>{{ account.username }}</strong></td>
+          <td>{{ account.devices.filter_by(is_active=True).count() }}</td>
+          <td>{{ account.token_balance }}</td>
+          <td>{{ "Active" if account.is_active else "Disabled" }}</td>
+          <td>{{ format_local(account.created_at) }}</td>
+          <td><a href="{{ url_for('admin.customer_detail', account_id=account.id) }}">View</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6">No customer accounts have been created yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if accounts.pages > 1 %}
+  <nav class="pagination">
+    {% if accounts.has_prev %}<a href="{{ url_for('admin.customers', page=accounts.prev_num) }}">Previous</a>{% endif %}
+    <span>Page {{ accounts.page }} of {{ accounts.pages }}</span>
+    {% if accounts.has_next %}<a href="{{ url_for('admin.customers', page=accounts.next_num) }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}
