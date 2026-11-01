@@ -60,6 +60,62 @@
   </section>
   {% endif %}
 
+  {% if purchasing_mode == 'tokens' %}
+  <section class="token-wallet">
+    <div class="wallet-top"><span>{{ theme.brand_name }}</span><span class="wallet-bell" aria-hidden="true">◦</span></div>
+    <div class="wallet-balance">{{ customer_account.token_balance if customer_account else 0 }}</div>
+    <div class="wallet-caption">Available Tokens</div>
+  </section>
+  {% if active_session %}<section class="panel panel-live"><h2>You're online</h2><p>{{ active_session.package.name }} · {{ remaining_label(active_session) }}</p></section>{% endif %}
+  <section class="panel token-panel">
+    <div class="token-tabs" role="tablist">
+      <button class="token-tab is-active" type="button" data-token-tab="packages">Packages</button>
+      <button class="token-tab" type="button" data-token-tab="history">History</button>
+      <button class="token-tab" type="button" data-token-tab="tokens">Tokens</button>
+    </div>
+    <div class="token-tab-panel" data-token-panel="packages">
+      <h2>Internet Packages</h2>
+      {% if customer_account and not active_session %}
+      <form method="post" action="{{ url_for('portal.token_free_trial') }}" class="trial-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-ghost" type="submit">Try free for 2 minutes</button></form>
+      {% endif %}
+      <div class="token-package-list">
+      {% for pkg in packages %}
+        <article class="token-package">
+          <div><strong>{{ pkg.name }}</strong><span>{{ pkg.duration_label() }}</span></div>
+          <b>{{ pkg.token_cost }} Tokens</b>
+          <form method="post" action="{{ url_for('portal.token_package_buy', package_id=pkg.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-primary" type="submit" {% if not customer_account or customer_account.token_balance < pkg.token_cost or active_session %}disabled{% endif %}>Buy</button></form>
+        </article>
+      {% else %}<p class="empty">No token packages are available.</p>{% endfor %}
+      </div>
+    </div>
+    <div class="token-tab-panel" data-token-panel="history" hidden>
+      <h2>History</h2>
+      <div class="wallet-history">
+      {% for item in wallet_history %}
+        <div class="wallet-history-row"><div><strong>{{ item.transaction_type|replace('_',' ')|title }}</strong><small>{{ format_local(item.created_at) }} · {{ item.note }}</small></div><b class="{% if item.amount > 0 %}credit{% else %}debit{% endif %}">{{ '%+d'|format(item.amount) }}</b></div>
+      {% else %}<p class="empty">Your token activity will appear here.</p>{% endfor %}
+      </div>
+    </div>
+    <div class="token-tab-panel" data-token-panel="tokens" hidden>
+      <h2>Token Bundles</h2>
+      <div class="token-package-list">
+      {% for bundle in token_bundles %}
+        <article class="token-package token-bundle">
+          <div><strong>{{ bundle.name }}</strong><span>{{ bundle.token_amount }} tokens</span></div>
+          <b>{{ '{:,}'.format(bundle.price_tzs) }} TZS</b>
+          <form method="post" action="{{ url_for('portal.token_bundle_request', bundle_id=bundle.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-primary" type="submit">Select</button></form>
+        </article>
+      {% else %}<p class="empty">No token bundles are available.</p>{% endfor %}
+      </div>
+      <button class="support-help" type="button" data-open-support>How to get tokens</button>
+    </div>
+  </section>
+  <dialog class="support-dialog" id="support-dialog">
+    <div class="support-dialog-head"><strong>How to get tokens</strong><button type="button" data-close-support aria-label="Close">×</button></div>
+    <div class="support-dialog-body"><p>Select a token bundle, make the payment, then contact support with your username and payment confirmation.</p>
+    {% if theme.support_phone %}<a class="btn btn-primary" href="tel:{{ theme.support_phone }}">Contact support · {{ theme.support_phone }}</a>{% else %}<p class="hint">Support contact is not configured yet.</p>{% endif %}</div>
+  </dialog>
+  {% else %}
   <section class="hero">
     <h1>{{ theme.hero_title }}</h1>
     <p>{{ theme.hero_subtitle }}</p>
@@ -207,6 +263,8 @@
   </section>
   {% endif %}
 
+  {% endif %}
+
   <footer class="site-foot">
     <p>{{ theme.footer_text }}</p>
     {% if theme.support_phone %}<p>Support: {{ theme.support_phone }}</p>{% endif %}
@@ -217,6 +275,13 @@
 {% block scripts %}
 <script>
 document.addEventListener("click", (event) => {
+  const tab = event.target.closest("[data-token-tab]");
+  if (tab) {
+    document.querySelectorAll("[data-token-tab]").forEach(el => el.classList.toggle("is-active", el === tab));
+    document.querySelectorAll("[data-token-panel]").forEach(el => { const active = el.dataset.tokenPanel === tab.dataset.tokenTab; el.hidden = !active; });
+  }
+  if (event.target.closest("[data-open-support]")) document.getElementById("support-dialog")?.showModal();
+  if (event.target.closest("[data-close-support]")) document.getElementById("support-dialog")?.close();
   const button = event.target.closest(".reveal-value");
   if (!button) return;
   const value = button.parentElement.querySelector(".private-value");
