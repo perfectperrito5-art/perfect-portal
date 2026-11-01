@@ -4,7 +4,7 @@
 
 {% block body %}
 <main class="shell">
-  <header class="brand-block">
+  <header class="brand-block {% if purchasing_mode == 'tokens' %}token-brand-hidden{% endif %}">
     {% if theme.logo_path %}
       <img class="brand-logo" src="{{ url_for('static', filename=theme.logo_path) }}" alt="{{ theme.brand_name }}">
     {% endif %}
@@ -94,6 +94,9 @@
       {% for item in wallet_history %}
         <div class="wallet-history-row"><div><strong>{{ item.transaction_type|replace('_',' ')|title }}</strong><small>{{ format_local(item.created_at) }} · {{ item.note }}</small></div><b class="{% if item.amount > 0 %}credit{% else %}debit{% endif %}">{{ '%+d'|format(item.amount) }}</b></div>
       {% else %}<p class="empty">Your token activity will appear here.</p>{% endfor %}
+      {% for award in award_history %}
+        <div class="wallet-history-row"><div><strong>{{ award.reason_snapshot }}</strong><small>{{ format_local(award.created_at) }} · Award</small></div><b class="credit">+{{ award.reward_amount }} {{ 'tokens' if award.reward_type == 'tokens' else 'min' }}</b></div>
+      {% endfor %}
       </div>
     </div>
     <div class="token-tab-panel" data-token-panel="tokens" hidden>
