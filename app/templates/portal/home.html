@@ -94,8 +94,8 @@
       {% for item in wallet_history %}
         <div class="wallet-history-row"><div><strong>{{ item.transaction_type|replace('_',' ')|title }}</strong><small>{{ format_local(item.created_at) }} · {{ item.note }}</small></div><b class="{% if item.amount > 0 %}credit{% else %}debit{% endif %}">{{ '%+d'|format(item.amount) }}</b></div>
       {% else %}<p class="empty">Your token activity will appear here.</p>{% endfor %}
-      {% for award in award_history %}
-        <div class="wallet-history-row"><div><strong>{{ award.reason_snapshot }}</strong><small>{{ format_local(award.created_at) }} · Award</small></div><b class="credit">+{{ award.reward_amount }} {{ 'tokens' if award.reward_type == 'tokens' else 'min' }}</b></div>
+      {% for award in award_history if award.reward_type == 'minutes' %}
+        <div class="wallet-history-row"><div><strong>{{ award.reason_snapshot }}</strong><small>{{ format_local(award.created_at) }} · Award</small></div><b class="credit">+{{ award.reward_amount }} min</b></div>
       {% endfor %}
       </div>
     </div>
