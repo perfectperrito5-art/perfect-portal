@@ -214,12 +214,16 @@ def customer_detail(account_id: int):
     activities = CustomerActivity.query.filter_by(account_id=account.id).order_by(
         CustomerActivity.created_at.desc()
     ).limit(50).all()
+    device_macs = [device.mac_address for device in devices]
+    customer_sessions = AccessSession.query.filter(AccessSession.mac_address.in_(device_macs)).order_by(
+        AccessSession.started_at.desc()
+    ).limit(50).all() if device_macs else []
     transactions = WalletTransaction.query.filter_by(account_id=account.id).order_by(
         WalletTransaction.created_at.desc()
     ).limit(50).all()
     return render_template(
         "admin/customer_detail.html", account=account, devices=devices,
-        activities=activities, transactions=transactions,
+        activities=activities, transactions=transactions, customer_sessions=customer_sessions,
     )
 
 
