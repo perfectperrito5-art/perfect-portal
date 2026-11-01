@@ -76,7 +76,7 @@
     <div class="token-tab-panel" data-token-panel="packages">
       <h2>Internet Packages</h2>
       {% if customer_account and not active_session %}
-      <form method="post" action="{{ url_for('portal.token_free_trial') }}" class="trial-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-ghost" type="submit">Try free for 2 minutes</button></form>
+      <form method="post" action="{{ url_for('portal.token_free_trial') }}" class="trial-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-ghost" type="submit" {% if trial_used_today %}disabled{% endif %}>{% if trial_used_today %}Free trial used today{% else %}Try free for 2 minutes{% endif %}</button></form>
       {% endif %}
       <div class="token-package-list">
       {% for pkg in packages %}
