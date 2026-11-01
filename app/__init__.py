@@ -99,7 +99,9 @@ def _register_blueprints(app: Flask) -> None:
         ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(
             ","
         )[0].strip()
-        mac = normalize_mac(request.args.get("mac")) or lookup_mac_for_ip(ip)
+        # Captive probe query parameters are client-controlled. Resolve identity
+        # only from the network lease/ARP mapping.
+        mac = lookup_mac_for_ip(ip)
         active = find_active_session(mac)
         if active:
             ensure_gateway_access(active)
