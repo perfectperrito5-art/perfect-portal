@@ -193,7 +193,7 @@ class TokenSafetyTests(unittest.TestCase):
             db.session.commit()
             debit_tokens(self.account_id, 50, note="Daily", reference=f"pkg:{self.account_id}:recovery-no-session")
             attempt = db.session.get(PackagePurchaseAttempt, attempt.id)
-            self.assertEqual(recover_package_purchase_attempt(attempt), "refunded")
+            self.assertEqual(recover_package_purchase_attempt(attempt, force=True), "refunded")
             self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 100)
             self.assertEqual(WalletTransaction.query.filter_by(reference=f"refund:pkg:{self.account_id}:recovery-no-session").count(), 1)
 
@@ -221,7 +221,7 @@ class TokenSafetyTests(unittest.TestCase):
             attempt.status = "recovery_required"
             db.session.commit()
             attempt = db.session.get(PackagePurchaseAttempt, attempt_id)
-            self.assertEqual(recover_package_purchase_attempt(attempt), "completed")
+            self.assertEqual(recover_package_purchase_attempt(attempt, force=True), "completed")
             self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 50)
             self.assertEqual(PackagePurchaseAttempt.query.filter_by(id=attempt_id).one().status, "completed")
 
