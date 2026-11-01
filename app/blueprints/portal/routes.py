@@ -140,12 +140,10 @@ def _client_mac() -> str | None:
 @bp.route("/")
 def home():
     mode = purchasing_mode()
-    packages = (
-        Package.query.filter_by(is_active=True)
-        .filter(Package.duration_minutes > 2)
-        .order_by(Package.sort_order.asc(), Package.price_tzs.asc())
-        .all()
-    )
+    package_query = Package.query.filter_by(is_active=True).filter(Package.duration_minutes > 2)
+    if mode == "tokens":
+        package_query = package_query.filter(Package.token_cost > 0)
+    packages = package_query.order_by(Package.sort_order.asc(), Package.price_tzs.asc()).all()
     mac = _client_mac()
     customer_account, customer_device = get_or_create_device_account(mac, _client_ip()) if mac else (None, None)
     active = find_active_session(mac)
