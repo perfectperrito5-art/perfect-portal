@@ -238,19 +238,11 @@ def token_package_buy(package_id):
         access = purchase_token_package(account, device, package, _client_ip(),
                                         idempotency_key=request.form.get("purchase_nonce", ""))
     except ValueError as exc:
-        if claim is not None and access is None:
-            db.session.delete(claim)
-            db.session.commit()
         flash(str(exc), "warning")
         return _portal_redirect("/")
     except Exception:
-        # If activation failed before a session was created, release the daily
-        # claim. If a session exists, retain the claim to avoid free retries.
-        if claim is not None and access is None:
-            db.session.delete(claim)
-            db.session.commit()
-        current_app.logger.exception("Daily trial activation failed for account %s", account.id)
-        flash("The free trial could not be activated. Please try again or contact support.", "danger")
+        current_app.logger.exception("Token package purchase failed")
+        flash("The purchase could not be completed. Please contact support before retrying.", "danger")
         return _portal_redirect("/")
     return redirect(url_for("portal.connected", session_id=access.id))
 
@@ -295,7 +287,17 @@ def token_free_trial():
                                          event_type="free_trial_started", details="Two-minute daily account trial"))
         db.session.commit()
     except ValueError as exc:
+        if claim is not None and access is None:
+            db.session.delete(claim)
+            db.session.commit()
         flash(str(exc), "warning")
+        return _portal_redirect("/")
+    except Exception:
+        if claim is not None and access is None:
+            db.session.delete(claim)
+            db.session.commit()
+        current_app.logger.exception("Daily trial activation failed for account %s", account.id)
+        flash("The free trial could not be activated. Please try again or contact support.", "danger")
         return _portal_redirect("/")
     return redirect(url_for("portal.connected", session_id=access.id))
 
