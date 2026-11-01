@@ -87,6 +87,9 @@ def purchase_token_package(account, device, package, ip_address=""):
         raise ValueError("Token purchasing is currently disabled.")
     if not account or not account.is_active or not device or not device.is_active:
         raise ValueError("Customer account or device unavailable.")
+    from app.services.access import find_active_session
+    if find_active_session(device.mac_address):
+        raise ValueError("This device already has an active internet session.")
     if not package or not package.is_active or package.token_cost <= 0:
         raise ValueError("This package is unavailable.")
     ref = f"pkg:{account.id}:{secrets.token_urlsafe(18)}"
@@ -105,6 +108,7 @@ def purchase_token_package(account, device, package, ip_address=""):
             details=f"{package.name} purchased for {package.token_cost} tokens",
         ))
         db.session.commit()
+        evaluate_consecutive_purchase_awards(account, access)
         return access
     except Exception:
         # A refund is only applied if no refund ledger entry exists. Preserve
