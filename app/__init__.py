@@ -26,6 +26,7 @@ def create_app(config_object: type = Config) -> Flask:
     _register_blueprints(app)
     _register_context(app)
     _bootstrap_db(app)
+    _recover_interrupted_token_purchases(app)
     _start_session_janitor(app)
 
     return app
@@ -263,6 +264,8 @@ def _start_session_janitor(app: Flask) -> None:
             try:
                 from app.services.access import revoke_expired_sessions
                 revoke_expired_sessions()
+                from app.services.tokens import recover_pending_package_purchases
+                recover_pending_package_purchases(limit=50)
                 now = time.monotonic()
                 if app.config.get("GATEWAY_ENABLED") and (
                     not state["last_gateway_sync"]
@@ -313,3 +316,15 @@ def _migrate_purchase_recovery_columns(app: Flask) -> None:
                 "ALTER TABLE access_sessions ADD COLUMN purchase_attempt_id INTEGER"
             ))
         app.logger.info("Added purchase_attempt_id to access_sessions.")
+
+
+def _recover_interrupted_token_purchases(app: Flask) -> None:
+    """Run one bounded recovery pass after the database is ready at startup."""
+    with app.app_context():
+        try:
+            from app.services.tokens import recover_pending_package_purchases
+            result = recover_pending_package_purchases(limit=100)
+            if any(result.values()):
+                app.logger.info("Recovered interrupted token purchases: %s", result)
+        except Exception:
+            app.logger.exception("Startup token-purchase recovery failed; janitor will retry.")
