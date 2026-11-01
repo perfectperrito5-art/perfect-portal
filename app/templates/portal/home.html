@@ -14,9 +14,10 @@
 
   {% if purchasing_mode == 'tokens' %}
   <section class="token-wallet">
-    <div class="wallet-top"><span>{{ theme.brand_name }}</span><span class="wallet-bell" aria-hidden="true">◦</span></div>
+    <div class="wallet-top"><span>{{ theme.brand_name }}</span></div>
     <div class="wallet-balance">{{ customer_account.token_balance if customer_account else 0 }}</div>
     <div class="wallet-caption">Available Tokens</div>
+    <button class="wallet-add" type="button" data-token-tab-trigger="tokens">Add Tokens</button>
   </section>
   {% if customer_account and customer_device %}
   <section class="panel account-panel">
@@ -68,12 +69,12 @@
 
   {% if active_session %}<section class="panel panel-live"><h2>You're online</h2><p>{{ active_session.package.name }} · {{ remaining_label(active_session) }}</p></section>{% endif %}
   <section class="panel token-panel">
-    <div class="token-tabs" role="tablist">
-      <button class="token-tab is-active" type="button" data-token-tab="packages">Packages</button>
-      <button class="token-tab" type="button" data-token-tab="history">History</button>
-      <button class="token-tab" type="button" data-token-tab="tokens">Tokens</button>
+    <div class="token-tabs" role="tablist" aria-label="Account sections">
+      <button class="token-tab is-active" id="token-tab-packages" type="button" role="tab" aria-selected="true" aria-controls="token-panel-packages" data-token-tab="packages">Packages</button>
+      <button class="token-tab" id="token-tab-history" type="button" role="tab" aria-selected="false" aria-controls="token-panel-history" data-token-tab="history">History</button>
+      <button class="token-tab" id="token-tab-tokens" type="button" role="tab" aria-selected="false" aria-controls="token-panel-tokens" data-token-tab="tokens">Tokens</button>
     </div>
-    <div class="token-tab-panel" data-token-panel="packages">
+    <div class="token-tab-panel" id="token-panel-packages" role="tabpanel" aria-labelledby="token-tab-packages" data-token-panel="packages">
       <h2>Internet Packages</h2>
       {% if customer_account and not active_session %}
       <form method="post" action="{{ url_for('portal.token_free_trial') }}" class="trial-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-ghost" type="submit" {% if trial_used_today %}disabled{% endif %}>{% if trial_used_today %}Free trial used today{% else %}Try free for 2 minutes{% endif %}</button></form>
@@ -88,7 +89,7 @@
       {% else %}<p class="empty">No token packages are available.</p>{% endfor %}
       </div>
     </div>
-    <div class="token-tab-panel" data-token-panel="history" hidden>
+    <div class="token-tab-panel" id="token-panel-history" role="tabpanel" aria-labelledby="token-tab-history" data-token-panel="history" hidden>
       <h2>History</h2>
       <div class="wallet-history">
       {% for item in wallet_history %}
@@ -99,7 +100,7 @@
       {% endfor %}
       </div>
     </div>
-    <div class="token-tab-panel" data-token-panel="tokens" hidden>
+    <div class="token-tab-panel" id="token-panel-tokens" role="tabpanel" aria-labelledby="token-tab-tokens" data-token-panel="tokens" hidden>
       <h2>Token Bundles</h2>
       <div class="token-package-list">
       {% for bundle in token_bundles %}
@@ -110,13 +111,21 @@
         </article>
       {% else %}<p class="empty">No token bundles are available.</p>{% endfor %}
       </div>
-      <button class="support-help" type="button" data-open-support>How to get tokens</button>
+      <button class="support-help" type="button" data-open-support>How to add tokens</button>
     </div>
   </section>
   <dialog class="support-dialog" id="support-dialog">
     <div class="support-dialog-head"><strong>How to get tokens</strong><button type="button" data-close-support aria-label="Close">×</button></div>
-    <div class="support-dialog-body"><p>Select a token bundle, make the payment, then contact support with your username and payment confirmation.</p>
-    {% if theme.support_phone %}<a class="btn btn-primary" href="tel:{{ theme.support_phone }}">Contact support · {{ theme.support_phone }}</a>{% else %}<p class="hint">Support contact is not configured yet.</p>{% endif %}</div>
+    <div class="support-dialog-body">
+      <p class="support-intro">Follow these simple steps to purchase your tokens.</p>
+      <ol class="support-steps">
+        <li><span>1</span><div><strong>Make a payment</strong><p>Select a bundle and send the required amount using the payment instructions provided by the hostel.</p></div></li>
+        <li><span>2</span><div><strong>Contact support</strong><p>Send your payment confirmation and account username.</p></div></li>
+        <li><span>3</span><div><strong>Receive tokens</strong><p>The support team will verify your payment and add tokens to your account.</p></div></li>
+      </ol>
+      {% if theme.support_phone %}<a class="btn btn-primary" href="tel:{{ theme.support_phone }}">Contact support</a>{% else %}<p class="hint">Support contact is not configured yet.</p>{% endif %}
+      <button class="support-done" type="button" data-close-support>Got it</button>
+    </div>
   </dialog>
   {% else %}
   <section class="hero">
