@@ -158,6 +158,8 @@ def evaluate_device_awards(account):
                            reason_snapshot=f"{rule.name}: reached {threshold} linked devices",
                            idempotency_key=key)
         db.session.add(grant)
+        db.session.add(CustomerActivity(account_id=account.id, event_type="award_granted",
+                                         details=grant.reason_snapshot))
         if rule.reward_type == "tokens":
             db.session.add(WalletTransaction(
                 account_id=account.id, amount=rule.reward_amount, transaction_type="award",
@@ -217,6 +219,8 @@ def evaluate_consecutive_purchase_awards(account, access_session):
             idempotency_key=key,
         )
         db.session.add(grant)
+        db.session.add(CustomerActivity(account_id=account.id, event_type="award_granted",
+                                         details=grant.reason_snapshot))
         if rule.reward_type == "tokens":
             _ledger(account.id, rule.reward_amount, "award",
                     note=grant.reason_snapshot, reference=key)
