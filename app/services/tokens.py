@@ -108,7 +108,7 @@ def _refund_purchase_attempt(attempt, reason):
     return True
 
 
-def recover_package_purchase_attempt(attempt):
+def recover_package_purchase_attempt(attempt, *, force=False):
     """Reconcile one interrupted purchase using its durable session/debit links."""
     from flask import current_app
     from app.models.session import AccessSession
@@ -116,6 +116,12 @@ def recover_package_purchase_attempt(attempt):
 
     if attempt.status in {"completed", "refunded", "failed"}:
         return attempt.status
+    if not force:
+        updated = attempt.updated_at or attempt.created_at
+        if updated and updated.tzinfo is None:
+            updated = updated.replace(tzinfo=timezone.utc)
+        if updated and (datetime.now(timezone.utc) - updated).total_seconds() < 120:
+            return "in_progress"
 
     debit_ref = f"pkg:{attempt.idempotency_key}"
     debit = WalletTransaction.query.filter_by(reference=debit_ref).first()
@@ -151,15 +157,15 @@ def recover_package_purchase_attempt(attempt):
     return attempt.status
 
 
-def recover_pending_package_purchases(limit=100):
+def recover_pending_package_purchases(limit=100, *, force=False):
     """Recover incomplete token purchases after startup or scheduled reconciliation."""
     attempts = PackagePurchaseAttempt.query.filter(
         PackagePurchaseAttempt.status.in_(("pending", "debited", "activating", "recovery_required"))
     ).order_by(PackagePurchaseAttempt.created_at.asc()).limit(max(1, min(int(limit), 500))).all()
-    results = {"completed": 0, "refunded": 0, "failed": 0, "recovery_required": 0}
+    results = {"completed": 0, "refunded": 0, "failed": 0, "recovery_required": 0, "in_progress": 0}
     for attempt in attempts:
         try:
-            status = recover_package_purchase_attempt(attempt)
+            status = recover_package_purchase_attempt(attempt, force=force)
             results[status] = results.get(status, 0) + 1
         except Exception:
             db.session.rollback()
