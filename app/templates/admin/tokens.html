@@ -29,7 +29,7 @@
 <section class="card">
   <h2>Customer bundle requests</h2>
   <table><thead><tr><th>Customer</th><th>Bundle</th><th>Payment</th><th>Requested</th><th>Action</th></tr></thead><tbody>
-  {% for item in requests_pending %}<tr><td>{{ item.account_id }}</td><td>{{ item.bundle_name }} · {{ item.token_amount }} tokens</td><td>{{ item.price_tzs }} TZS</td><td>{{ format_local(item.created_at) }}</td><td><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="credit_request"><input type="hidden" name="purchase_id" value="{{ item.id }}"><input name="payment_reference" placeholder="Payment ref" maxlength="100" required><button class="linkish">Verify &amp; credit</button></form></td></tr>{% else %}<tr><td colspan="5">No pending requests.</td></tr>{% endfor %}
+  {% for item in requests_pending %}<tr><td><a href="{{ url_for('admin.customer_detail', account_id=item.account_id) }}">{{ item.account.username if item.account else item.account_id }}</a></td><td>{{ item.bundle_name }} · {{ item.token_amount }} tokens</td><td>{{ item.price_tzs }} TZS</td><td>{{ format_local(item.created_at) }}</td><td><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="credit_request"><input type="hidden" name="purchase_id" value="{{ item.id }}"><input name="payment_reference" placeholder="Payment ref" maxlength="100" required><button class="linkish">Verify &amp; credit</button></form></td></tr>{% else %}<tr><td colspan="5">No pending requests.</td></tr>{% endfor %}
   </tbody></table>
 </section>
 <section class="card">
