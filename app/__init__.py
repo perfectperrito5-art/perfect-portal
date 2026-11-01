@@ -248,24 +248,35 @@ def _start_session_janitor(app: Flask) -> None:
     if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") == "false":
         return
 
-    sync_on_first_tick = {"pending": True}
+    # Expiry enforcement remains frequent; gateway reconciliation runs on a
+    # separate, slower cadence so firewall restarts or lost nft state recover.
+    expiry_interval = max(10, int(app.config.get("SESSION_JANITOR_INTERVAL", 30)))
+    gateway_interval = max(expiry_interval, int(app.config.get("GATEWAY_RECONCILE_INTERVAL", 300)))
+    state = {"last_gateway_sync": 0.0}
 
     def _tick():
+        import time
         with app.app_context():
             try:
                 from app.services.access import revoke_expired_sessions
                 revoke_expired_sessions()
-                if sync_on_first_tick["pending"] and app.config.get("GATEWAY_ENABLED"):
+                now = time.monotonic()
+                if app.config.get("GATEWAY_ENABLED") and (
+                    not state["last_gateway_sync"]
+                    or now - state["last_gateway_sync"] >= gateway_interval
+                ):
                     from app.services.access import sync_active_sessions_to_gateway
                     sync_active_sessions_to_gateway()
-                sync_on_first_tick["pending"] = False
+                    state["last_gateway_sync"] = now
             except Exception:
+                # Keep the last successful sync timestamp unchanged so a
+                # failed reconciliation is retried on the next janitor tick.
                 app.logger.exception("Session janitor failed")
-        timer = threading.Timer(30.0, _tick)
+        timer = threading.Timer(expiry_interval, _tick)
         timer.daemon = True
         timer.start()
 
-    timer = threading.Timer(30.0, _tick)
+    timer = threading.Timer(expiry_interval, _tick)
     timer.daemon = True
     timer.start()
 
