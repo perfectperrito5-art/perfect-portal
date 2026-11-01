@@ -143,4 +143,6 @@ def link_device_with_code(code: str, mac_address: str, ip_address: str = ""):
         event_type="device_linked", details="A device was linked using a one-time code",
     ))
     db.session.commit()
+    from app.services.tokens import evaluate_device_awards
+    evaluate_device_awards(account)
     return account, device
