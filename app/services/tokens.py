@@ -128,7 +128,8 @@ def evaluate_device_awards(account):
         threshold = max(1, int(criteria.get("device_count", 2)))
         if count < threshold:
             continue
-        key = f"award:{rule.id}:account:{account.id}:device-threshold:{threshold}"
+        milestone = count // threshold if rule.repeatable else 1
+        key = f"award:{rule.id}:account:{account.id}:device-threshold:{threshold}:milestone:{milestone}"
         if AwardGrant.query.filter_by(idempotency_key=key).first():
             continue
         grant = AwardGrant(rule_id=rule.id, account_id=account.id,
