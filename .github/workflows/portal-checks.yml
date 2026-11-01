@@ -73,5 +73,3 @@ jobs:
           PY
       - name: Run focused token safety unit tests
         run: python -m unittest discover -s tests -v
-
-          PY
