@@ -323,7 +323,7 @@ def _recover_interrupted_token_purchases(app: Flask) -> None:
     with app.app_context():
         try:
             from app.services.tokens import recover_pending_package_purchases
-            result = recover_pending_package_purchases(limit=100)
+            result = recover_pending_package_purchases(limit=100, force=True)
             if any(result.values()):
                 app.logger.info("Recovered interrupted token purchases: %s", result)
         except Exception:
