@@ -77,7 +77,7 @@ def claim_daily_trial(account_id, device_id=None):
     return claim
 
 
-def purchase_token_package(account, device, package, ip_address=""):
+def purchase_token_package(account, device, package, ip_address="", idempotency_key=""):
     """Deduct once, grant access, and compensate if firewall authorisation fails."""
     from app.services.access import grant_access, revoke_session
     from app.models.customer import CustomerActivity
@@ -92,7 +92,19 @@ def purchase_token_package(account, device, package, ip_address=""):
         raise ValueError("This device already has an active internet session.")
     if not package or not package.is_active or package.token_cost <= 0:
         raise ValueError("This package is unavailable.")
-    ref = f"pkg:{account.id}:{secrets.token_urlsafe(18)}"
+    if not idempotency_key or len(idempotency_key) > 80:
+        raise ValueError("Refresh the portal and try your purchase again.")
+    ref = f"pkg:{account.id}:{idempotency_key}"
+    previous = WalletTransaction.query.filter_by(reference=ref).first()
+    if previous:
+        if previous.amount < 0:
+            from app.models.session import AccessSession
+            previous_session = AccessSession.query.filter_by(
+                mac_address=device.mac_address, package_id=package.id, revoked=False
+            ).order_by(AccessSession.started_at.desc()).first()
+            if previous_session and previous_session.is_active():
+                return previous_session
+        raise ValueError("This purchase request has already been processed. Refresh the portal before trying again.")
     debit_tokens(account.id, package.token_cost, note=f"Package: {package.name}", reference=ref)
     try:
         access = grant_access(package=package, mac=device.mac_address, ip=ip_address)
