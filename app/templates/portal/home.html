@@ -286,25 +286,6 @@
 
 {% block scripts %}
 <script>
-document.addEventListener("click", (event) => {
-  const tab = event.target.closest("[data-token-tab]");
-  if (tab) {
-    document.querySelectorAll("[data-token-tab]").forEach(el => el.classList.toggle("is-active", el === tab));
-    document.querySelectorAll("[data-token-panel]").forEach(el => { const active = el.dataset.tokenPanel === tab.dataset.tokenTab; el.hidden = !active; });
-  }
-  if (event.target.closest("[data-open-support]")) document.getElementById("support-dialog")?.showModal();
-  if (event.target.closest("[data-close-support]")) document.getElementById("support-dialog")?.close();
-  const button = event.target.closest(".reveal-value");
-  if (!button) return;
-  const value = button.parentElement.querySelector(".private-value");
-  if (!value) return;
-  const shown = button.dataset.shown === "1";
-  value.textContent = shown ? "••••••••" : value.dataset.privateValue;
-  button.dataset.shown = shown ? "0" : "1";
-  button.textContent = shown ? "Show" : "Hide";
-});
-</script>
-<script>
   document.addEventListener('DOMContentLoaded', () => {
     const packageId = document.getElementById('package_id');
     const radios = document.querySelectorAll('input[name="package_pick"]');
