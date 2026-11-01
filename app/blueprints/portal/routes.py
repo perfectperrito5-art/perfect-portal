@@ -112,14 +112,11 @@ def _client_mac() -> str | None:
     """
     ip = _client_ip()
     wire = lookup_mac_for_ip(ip)
-    query_mac = normalize_mac(
-        request.args.get("mac")
-        or request.args.get("client_mac")
-        or request.form.get("mac")
-    )
+    # MAC query/form values are client-controlled and must never establish
+    # account identity. Only accept a MAC resolved from the current network
+    # lease/ARP table, or a previously network-verified signed session cookie.
     cookie = normalize_mac(session.get("client_mac"))
-
-    mac = wire or query_mac or cookie
+    mac = wire or cookie
     if not mac:
         return None
 
