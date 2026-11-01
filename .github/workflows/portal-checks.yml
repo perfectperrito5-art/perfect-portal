@@ -36,6 +36,8 @@ jobs:
           from app.services.tokens import claim_daily_trial
           app = create_app()
           app.testing = True
+          from app.blueprints.portal import routes as portal_routes
+          portal_routes.lookup_mac_for_ip = lambda ip: "AA:BB:CC:DD:EE:FF"
           client = app.test_client()
           legacy = client.get("/")
           assert legacy.status_code == 200, legacy.status_code
@@ -68,4 +70,8 @@ jobs:
               account = db.session.get(CustomerAccount, account_id)
               assert account.token_balance == 90, account.token_balance
           print("Legacy/token rendering, wallet debit, and daily trial uniqueness passed.")
+          PY
+      - name: Run focused token safety unit tests
+        run: python -m unittest discover -s tests -v
+
           PY
