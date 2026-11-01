@@ -29,8 +29,6 @@ jobs:
         run: |
           python - <<'PY'
           from app import create_app
-          app = create_app()
-          app.testing = True
           from app.extensions import db
           from app.models.settings import SiteSetting
           from app.models.customer import CustomerAccount
