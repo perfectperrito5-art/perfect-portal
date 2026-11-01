@@ -31,7 +31,21 @@ jobs:
           from app import create_app
           app = create_app()
           app.testing = True
-          response = app.test_client().get("/")
-          assert response.status_code == 200, response.status_code
-          print("Application bootstrap and portal render passed.")
+          from app.extensions import db
+          from app.models.settings import SiteSetting
+          from app.models.customer import CustomerAccount
+          app = create_app()
+          app.testing = True
+          client = app.test_client()
+          legacy = client.get("/")
+          assert legacy.status_code == 200, legacy.status_code
+          with app.app_context():
+              SiteSetting.set("purchasing_mode", "tokens")
+          token_page = client.get("/?mac=AA:BB:CC:DD:EE:FF")
+          assert token_page.status_code == 200, token_page.status_code
+          assert b"Available Tokens" in token_page.data
+          assert b"Token Bundles" in token_page.data
+          with app.app_context():
+              assert CustomerAccount.query.count() == 1
+          print("Legacy and token-mode portal rendering passed.")
           PY
