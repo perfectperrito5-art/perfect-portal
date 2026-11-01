@@ -1,4 +1,5 @@
 import unittest
+import threading
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
@@ -22,7 +23,8 @@ class TokenSafetyTests(unittest.TestCase):
     def setUpClass(cls):
         class TestConfig:
             SECRET_KEY = "unit-test-secret"
-            SQLALCHEMY_DATABASE_URI = "sqlite://"
+            SQLALCHEMY_DATABASE_URI = "sqlite:////tmp/perfect-portal-token-unit-tests.db"
+            SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 10, "check_same_thread": False}}
             SQLALCHEMY_TRACK_MODIFICATIONS = False
             WTF_CSRF_ENABLED = False
             GATEWAY_ENABLED = False
@@ -145,12 +147,38 @@ class TokenSafetyTests(unittest.TestCase):
             self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 100)
 
 
-    def test_competing_debits_cannot_overdraw_wallet(self):
+    def test_concurrent_debits_cannot_overdraw_wallet(self):
+        barrier = threading.Barrier(2)
+        outcomes = []
+        outcome_lock = threading.Lock()
+
+        def compete(reference):
+            try:
+                with self.app.app_context():
+                    barrier.wait(timeout=5)
+                    debit_tokens(self.account_id, 60, note="concurrent purchase", reference=reference)
+                    result = "success"
+            except ValueError:
+                result = "insufficient"
+            except Exception as exc:
+                result = f"error:{type(exc).__name__}:{exc}"
+            with outcome_lock:
+                outcomes.append(result)
+
+        threads = [
+            threading.Thread(target=compete, args=("race:thread-1",)),
+            threading.Thread(target=compete, args=("race:thread-2",)),
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=15)
+        self.assertFalse(any(thread.is_alive() for thread in threads), "Concurrent debit test timed out")
+        self.assertEqual(outcomes.count("success"), 1, outcomes)
+        self.assertEqual(outcomes.count("insufficient"), 1, outcomes)
         with self.app.app_context():
-            debit_tokens(self.account_id, 60, note="first", reference="race:first")
-            with self.assertRaises(ValueError):
-                debit_tokens(self.account_id, 60, note="second", reference="race:second")
             self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 40)
+
 
     def test_interrupted_debit_without_session_is_refunded_once(self):
         with self.app.app_context():
