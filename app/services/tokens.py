@@ -117,7 +117,7 @@ def recover_package_purchase_attempt(attempt):
     if attempt.status in {"completed", "refunded", "failed"}:
         return attempt.status
 
-    debit_ref = f"pkg:{attempt.account_id}:{attempt.idempotency_key}"
+    debit_ref = f"pkg:{attempt.idempotency_key}"
     debit = WalletTransaction.query.filter_by(reference=debit_ref).first()
     if not debit:
         attempt.status = "failed"
@@ -191,9 +191,10 @@ def purchase_token_package(account, device, package, ip_address="", idempotency_
         raise ValueError("This device already has an active internet session.")
     if not package or not package.is_active or package.token_cost <= 0:
         raise ValueError("This package is unavailable.")
-    if not idempotency_key or len(idempotency_key) > 80:
+    if not idempotency_key or len(idempotency_key) > 48:
         raise ValueError("Refresh the portal and try your purchase again.")
 
+    attempt_key = f"{account.id}:{idempotency_key}"
     existing = PackagePurchaseAttempt.query.filter_by(idempotency_key=attempt_key).first()
     if existing:
         if existing.account_id != account.id or existing.device_id != device.id:
@@ -216,7 +217,7 @@ def purchase_token_package(account, device, package, ip_address="", idempotency_
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
-        existing = PackagePurchaseAttempt.query.filter_by(idempotency_key=idempotency_key).first()
+        existing = PackagePurchaseAttempt.query.filter_by(idempotency_key=attempt_key).first()
         if existing and existing.account_id == account.id and existing.device_id == device.id:
             status = recover_package_purchase_attempt(existing)
             if status == "completed":
