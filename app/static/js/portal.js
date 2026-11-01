@@ -48,11 +48,11 @@
   supportDialog?.addEventListener("click", (event) => { if (event.target === supportDialog) supportDialog.close(); });
   document.querySelectorAll(".reveal-value").forEach((button) => {
     button.addEventListener("click", () => {
-      const value = button.parentElement?.querySelector("[data-private-value]");
+      const value = button.parentElement?.querySelector(".private-value");
       if (!value) return;
-      const visible = value.dataset.revealed === "true";
+      const visible = button.dataset.shown === "1";
       value.textContent = visible ? "••••••••" : value.dataset.privateValue;
-      value.dataset.revealed = visible ? "false" : "true";
+      button.dataset.shown = visible ? "0" : "1";
       button.textContent = visible ? "Show" : "Hide";
     });
   });
