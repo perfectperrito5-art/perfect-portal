@@ -248,17 +248,17 @@ def _start_session_janitor(app: Flask) -> None:
     if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") == "false":
         return
 
+    sync_on_first_tick = {"pending": True}
+
     def _tick():
         with app.app_context():
             try:
-                from app.services.access import (
-                    revoke_expired_sessions,
-                    sync_active_sessions_to_gateway,
-                )
-
+                from app.services.access import revoke_expired_sessions
                 revoke_expired_sessions()
-                if app.config.get("GATEWAY_ENABLED"):
+                if sync_on_first_tick["pending"] and app.config.get("GATEWAY_ENABLED"):
+                    from app.services.access import sync_active_sessions_to_gateway
                     sync_active_sessions_to_gateway()
+                sync_on_first_tick["pending"] = False
             except Exception:
                 app.logger.exception("Session janitor failed")
         timer = threading.Timer(30.0, _tick)
