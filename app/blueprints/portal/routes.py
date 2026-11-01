@@ -238,7 +238,19 @@ def token_package_buy(package_id):
         access = purchase_token_package(account, device, package, _client_ip(),
                                         idempotency_key=request.form.get("purchase_nonce", ""))
     except ValueError as exc:
+        if claim is not None and access is None:
+            db.session.delete(claim)
+            db.session.commit()
         flash(str(exc), "warning")
+        return _portal_redirect("/")
+    except Exception:
+        # If activation failed before a session was created, release the daily
+        # claim. If a session exists, retain the claim to avoid free retries.
+        if claim is not None and access is None:
+            db.session.delete(claim)
+            db.session.commit()
+        current_app.logger.exception("Daily trial activation failed for account %s", account.id)
+        flash("The free trial could not be activated. Please try again or contact support.", "danger")
         return _portal_redirect("/")
     return redirect(url_for("portal.connected", session_id=access.id))
 
@@ -265,6 +277,8 @@ def token_free_trial():
                                 sort_order=-100, is_active=False)
         db.session.add(trial_package)
         db.session.commit()
+    claim = None
+    access = None
     try:
         claim = claim_daily_trial(account.id, device.id)
         access = __import__("app.services.access", fromlist=["grant_access"]).grant_access(
