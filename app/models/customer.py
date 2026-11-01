@@ -15,7 +15,8 @@ class CustomerAccount(db.Model):
     __tablename__ = "customer_accounts"
 
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(24), unique=True, nullable=False, index=True)
+    username = db.Column(db.String(24), unique=True, nullable=False, index=True)  # internal identifier
+    display_name = db.Column(db.String(40), nullable=False, default="Guest")
     token_balance = db.Column(db.Integer, nullable=False, default=0)
     is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
@@ -27,7 +28,10 @@ class CustomerAccount(db.Model):
 
 class CustomerDevice(db.Model):
     __tablename__ = "customer_devices"
-    __table_args__ = (db.UniqueConstraint("account_id", "mac_address", name="uq_customer_device_account_mac"),)
+    __table_args__ = (
+        db.UniqueConstraint("account_id", name="uq_customer_device_one_per_account"),
+        db.UniqueConstraint("account_id", "mac_address", name="uq_customer_device_account_mac"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     account_id = db.Column(db.Integer, db.ForeignKey("customer_accounts.id"), nullable=False, index=True)
