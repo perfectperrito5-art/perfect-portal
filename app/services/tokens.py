@@ -181,25 +181,29 @@ def evaluate_consecutive_purchase_awards(account, access_session):
         criteria = json.loads(rule.criteria_json or "{}")
         required_days = max(2, int(criteria.get("consecutive_days", 3)))
         required_package = criteria.get("package_id")
-        # Historical purchases remain qualifying even after the access session expires
-        # or is revoked by the next package purchase.
-        query = AccessSession.query.filter(
+        if not required_package:
+            continue
+        required_package = int(required_package)
+        # Include every package purchase: a different package on a date
+        # interrupts this same-package streak rather than being ignored.
+        sessions = AccessSession.query.filter(
             AccessSession.mac_address.in_(device_macs),
-        ).order_by(AccessSession.started_at.desc()).limit(500)
-        sessions = query.all()
-        day_package = {}
+        ).order_by(AccessSession.started_at.desc()).limit(500).all()
+        packages_by_day = {}
         for item in sessions:
-            if required_package and item.package_id != int(required_package):
-                continue
             stamp = as_utc(item.started_at)
             if stamp:
                 local_day = stamp.astimezone(LOCAL_TZ).date()
-                day_package.setdefault(local_day, item)
-        if not day_package:
+                packages_by_day.setdefault(local_day, set()).add(item.package_id)
+        qualifying_days = {
+            day for day, package_ids in packages_by_day.items()
+            if package_ids == {required_package}
+        }
+        if not qualifying_days:
             continue
-        latest = max(day_package)
+        latest = max(qualifying_days)
         streak = [latest]
-        while streak[-1] - timedelta(days=1) in day_package:
+        while streak[-1] - timedelta(days=1) in qualifying_days:
             streak.append(streak[-1] - timedelta(days=1))
         if len(streak) < required_days:
             continue
