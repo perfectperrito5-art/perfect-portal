@@ -83,7 +83,7 @@
         <article class="token-package">
           <div><strong>{{ pkg.name }}</strong><span>{{ pkg.duration_label() }}</span></div>
           <b>{{ pkg.token_cost }} Tokens</b>
-          <form method="post" action="{{ url_for('portal.token_package_buy', package_id=pkg.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-primary" type="submit" {% if not customer_account or customer_account.token_balance < pkg.token_cost or active_session %}disabled{% endif %}>Buy</button></form>
+          <form method="post" action="{{ url_for('portal.token_package_buy', package_id=pkg.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="purchase_nonce" value="{{ purchase_nonce }}"><button class="btn btn-primary" type="submit" {% if not customer_account or customer_account.token_balance < pkg.token_cost or active_session %}disabled{% endif %}>Buy</button></form>
         </article>
       {% else %}<p class="empty">No token packages are available.</p>{% endfor %}
       </div>
