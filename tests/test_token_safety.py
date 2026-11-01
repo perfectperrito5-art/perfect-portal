@@ -158,7 +158,7 @@ class TokenSafetyTests(unittest.TestCase):
                 account_id=self.account_id, device_id=self.device_id,
                 package_id=self.package_id, package_name="Daily", token_cost=50,
                 mac_address="AA:BB:CC:DD:EE:FF", ip_address="192.168.3.10",
-                idempotency_key="recovery-no-session", status="debited",
+                idempotency_key=f"{self.account_id}:recovery-no-session", status="debited",
             )
             db.session.add(attempt)
             db.session.commit()
@@ -182,7 +182,7 @@ class TokenSafetyTests(unittest.TestCase):
                         "gateway-failure-test",
                     )
             self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 100)
-            attempt = PackagePurchaseAttempt.query.filter_by(idempotency_key="gateway-failure-test").one()
+            attempt = PackagePurchaseAttempt.query.filter_by(idempotency_key=f"{self.account_id}:gateway-failure-test").one()
             self.assertEqual(attempt.status, "refunded")
 
     def test_duplicate_purchase_request_does_not_debit_twice(self):
@@ -196,7 +196,7 @@ class TokenSafetyTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 purchase_token_package(account, device, package, "192.168.3.10", "same-request")
             self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 50)
-            self.assertEqual(PackagePurchaseAttempt.query.filter_by(idempotency_key="same-request").count(), 1)
+            self.assertEqual(PackagePurchaseAttempt.query.filter_by(idempotency_key=f"{self.account_id}:same-request").count(), 1)
 
     def test_device_link_code_cannot_be_reused(self):
         with self.app.app_context():
