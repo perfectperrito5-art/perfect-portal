@@ -196,6 +196,34 @@ class TokenSafetyTests(unittest.TestCase):
             self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 100)
             self.assertEqual(WalletTransaction.query.filter_by(reference=f"refund:pkg:{self.account_id}:recovery-no-session").count(), 1)
 
+    def test_recovery_completes_when_session_was_created_before_crash(self):
+        with self.app.app_context():
+            SiteSetting.set("purchasing_mode", "tokens")
+            attempt = PackagePurchaseAttempt(
+                account_id=self.account_id, device_id=self.device_id,
+                package_id=self.package_id, package_name="Daily", token_cost=50,
+                mac_address="AA:BB:CC:DD:EE:FF", ip_address="192.168.3.10",
+                idempotency_key=f"{self.account_id}:crash-after-session", status="activating",
+            )
+            db.session.add(attempt)
+            db.session.commit()
+            debit_tokens(self.account_id, 50, note="Daily", reference=f"pkg:{attempt.idempotency_key}")
+            from app.services.access import grant_access
+            session_row = grant_access(
+                package=db.session.get(Package, self.package_id),
+                mac="AA:BB:CC:DD:EE:FF", ip="192.168.3.10",
+                purchase_attempt_id=attempt.id,
+            )
+            attempt_id = attempt.id
+            self.assertEqual(session_row.purchase_attempt_id, attempt_id)
+            # Simulate process death after session commit but before attempt completion.
+            attempt.status = "recovery_required"
+            db.session.commit()
+            attempt = db.session.get(PackagePurchaseAttempt, attempt_id)
+            self.assertEqual(recover_package_purchase_attempt(attempt), "completed")
+            self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 50)
+            self.assertEqual(PackagePurchaseAttempt.query.filter_by(id=attempt_id).one().status, "completed")
+
     def test_gateway_authorisation_failure_revokes_then_refunds(self):
         with self.app.app_context():
             SiteSetting.set("purchasing_mode", "tokens")
