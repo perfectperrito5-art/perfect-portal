@@ -33,6 +33,7 @@ from app.models.customer import CustomerActivity, WalletTransaction
 from app.models.token import TokenBundle, TokenPurchase, AwardGrant
 from app.services.tokens import purchasing_mode, purchase_token_package, claim_daily_trial
 import re
+import secrets
 from app.services.phone import detect_network
 from app.services.selcom import SelcomError
 
@@ -166,6 +167,7 @@ def home():
         token_bundles=token_bundles,
         wallet_history=wallet_history,
         award_history=award_history,
+        purchase_nonce=secrets.token_urlsafe(18),
         pay_form=pay_form,
         voucher_form=voucher_form,
         active_session=active,
@@ -234,7 +236,8 @@ def token_package_buy(package_id):
     account, device = get_or_create_device_account(mac, _client_ip()) if mac else (None, None)
     package = Package.query.get_or_404(package_id)
     try:
-        access = purchase_token_package(account, device, package, _client_ip())
+        access = purchase_token_package(account, device, package, _client_ip(),
+                                        idempotency_key=request.form.get("purchase_nonce", ""))
     except ValueError as exc:
         flash(str(exc), "warning")
         return _portal_redirect("/")
