@@ -1,6 +1,6 @@
 {% extends "partials/base.html" %}
 {% block title %}{{ theme.brand_name }} · Connect{% endblock %}
-{% block body_class %}page-home{% endblock %}
+{% block body_class %}page-home{% if purchasing_mode == 'tokens' %} token-mode{% endif %}{% endblock %}
 
 {% block body %}
 <main class="shell">
