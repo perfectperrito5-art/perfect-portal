@@ -653,3 +653,61 @@ body {
 @media(max-width:420px){.token-package{grid-template-columns:minmax(0,1fr) auto;}.token-package form{grid-column:1/-1}.token-package .btn{width:100%;}}
 
 .token-brand-hidden { display:none; }
+
+
+/* Token mode refinement: calm surfaces, fewer containers, theme-driven details. */
+.page-home:has(.token-wallet) { color:var(--brand-text); }
+.page-home:has(.token-wallet) .shell { width:min(720px,calc(100% - 2rem)); padding-top:clamp(1rem,3vw,2rem); animation:none; }
+.page-home:has(.token-wallet) .atmosphere::after {
+ background:radial-gradient(ellipse 75% 45% at 15% 5%,color-mix(in srgb,var(--brand-primary) 13%,transparent),transparent 62%),linear-gradient(180deg,color-mix(in srgb,var(--brand-primary) 5%,transparent),transparent 58%);
+}
+.token-wallet {
+ padding:clamp(1.2rem,4vw,2rem) clamp(1.2rem,4vw,2.1rem) 1.35rem; margin-bottom:1.1rem; border-radius:26px;
+ background:radial-gradient(ellipse 75% 90% at 100% 5%,color-mix(in srgb,var(--brand-accent) 24%,transparent),transparent 62%),linear-gradient(145deg,color-mix(in srgb,var(--brand-primary) 82%,#8b5cf6),var(--brand-primary) 72%,color-mix(in srgb,var(--brand-primary) 65%,#24105c));
+ box-shadow:0 16px 38px color-mix(in srgb,var(--brand-primary) 22%,transparent);
+}
+.token-wallet::before { width:75%;height:110%;right:-18%;top:-65%;background:color-mix(in srgb,var(--brand-accent) 12%,transparent); }
+.token-wallet::after { width:130%;height:75%;left:-25%;bottom:-58%;background:rgba(255,255,255,.12); }
+.wallet-top { font-size:clamp(1.05rem,3vw,1.35rem); }
+.wallet-balance { margin-top:.85rem;font-size:clamp(3.25rem,12vw,5rem);letter-spacing:-.045em; }
+.wallet-caption { font-size:1.02rem;font-weight:600; }
+.wallet-add { display:block;min-width:190px;margin:1rem auto 0;padding:.72rem 1.6rem;border:0;border-radius:999px;background:color-mix(in srgb,var(--brand-surface) 88%,white);color:var(--brand-primary);font:inherit;font-weight:750;cursor:pointer;transition:filter .16s ease,transform .16s ease; }
+.wallet-add:hover { filter:brightness(1.04);transform:translateY(-1px); }
+.account-panel,.token-panel { border:1px solid color-mix(in srgb,var(--brand-primary) 10%,transparent);box-shadow:0 9px 26px rgba(31,24,75,.06);backdrop-filter:blur(12px); }
+.account-panel { margin-bottom:1.1rem;padding:1rem clamp(1rem,3vw,1.4rem); }
+.account-meta { grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem; }
+.account-meta>div+div { border-left:1px solid color-mix(in srgb,var(--brand-primary) 17%,transparent);padding-left:.8rem; }
+.account-meta dt { font-size:.76rem; }.account-meta dd { font-size:.84rem; }
+.token-panel { padding:clamp(.9rem,3vw,1.35rem); }
+.token-tabs { gap:0;padding:.18rem;margin-bottom:1.35rem;border:1px solid color-mix(in srgb,var(--brand-primary) 15%,transparent);background:color-mix(in srgb,var(--brand-primary) 4%,transparent); }
+.token-tab { padding:.72rem .35rem;transition:color .15s ease,background .15s ease; }
+.token-tab.is-active { background:color-mix(in srgb,var(--brand-surface) 92%,white);box-shadow:0 2px 8px rgba(31,24,75,.06); }
+.token-tab-panel h2 { font-size:1.2rem;margin-bottom:.9rem; }
+.token-package-list { gap:0; }
+.token-package { grid-template-columns:minmax(0,1fr) auto auto;gap:clamp(.5rem,2vw,1.15rem);padding:.95rem .35rem;border:0;border-radius:0;border-bottom:1px solid color-mix(in srgb,var(--brand-primary) 12%,transparent);background:transparent; }
+.token-package:last-child { border-bottom:0; }
+.token-package>div strong { font-size:.98rem;color:var(--brand-text); }.token-package>div span { font-size:.86rem; }
+.token-package>b { font-size:.95rem; }.token-package .btn { min-width:82px;padding:.62rem 1.05rem;border-radius:999px;background:linear-gradient(135deg,var(--brand-primary),color-mix(in srgb,var(--brand-primary) 76%,#8b5cf6)); }
+.trial-form { margin:0 0 .75rem; }.trial-form .btn { width:auto;padding:.55rem .9rem; }
+.wallet-history-row { padding:.85rem .1rem; }.support-help { padding:1rem 0 .2rem; }
+.support-dialog { width:min(500px,calc(100% - 1.5rem));max-height:min(88vh,760px);overflow:auto;border-radius:25px; }
+.support-dialog-head { padding:1.15rem 1.35rem;background:radial-gradient(ellipse at 100% 0,color-mix(in srgb,var(--brand-accent) 22%,transparent),transparent 55%),linear-gradient(135deg,var(--brand-primary),color-mix(in srgb,var(--brand-primary) 70%,#35108c)); }
+.support-dialog-body { padding:1.25rem clamp(1.1rem,4vw,1.6rem) 1.4rem; }.support-intro { font-weight:600;color:var(--brand-text)!important; }
+.support-steps { list-style:none;margin:1.1rem 0 1.35rem;padding:0;display:grid;gap:1rem; }
+.support-steps li { display:grid;grid-template-columns:2.2rem minmax(0,1fr);gap:.8rem;align-items:start; }
+.support-steps li>span { display:grid;place-items:center;width:2rem;height:2rem;border-radius:50%;background:color-mix(in srgb,var(--brand-primary) 78%,#9b75ff);color:white;font-weight:800; }
+.support-steps strong { color:var(--brand-text); }.support-steps p { margin:.18rem 0 0;color:var(--brand-muted);line-height:1.45; }
+.support-dialog-body .btn-primary { margin-top:.25rem; }
+.support-done { display:block;width:100%;margin-top:.65rem;padding:.75rem 1rem;border:0;border-radius:999px;background:var(--brand-primary);color:white;font:inherit;font-weight:750;cursor:pointer; }
+@media(min-width:760px) { .page-home:has(.token-wallet) .shell { width:min(780px,calc(100% - 3rem)); } }
+@media(max-width:520px) {
+ .page-home:has(.token-wallet) .shell { width:min(calc(100% - 1.1rem),720px);padding-top:.65rem; }
+ .token-wallet { border-radius:21px;margin-bottom:.8rem; }
+ .account-meta { grid-template-columns:1fr;gap:.55rem; }
+ .account-meta>div+div { border-left:0;border-top:1px solid color-mix(in srgb,var(--brand-primary) 14%,transparent);padding:.55rem 0 0; }
+ .token-panel { padding:.85rem; }
+ .token-package { grid-template-columns:minmax(0,1fr) auto;padding:.9rem .1rem; }
+ .token-package form { grid-column:2;grid-row:1/span 2; }.token-package .btn { min-width:70px;width:auto; }
+ .token-package>b { grid-column:1;grid-row:2;justify-self:start; }
+}
+@media(prefers-reduced-motion:reduce) { .wallet-add,.token-tab,.token-package .btn { transition:none; } }
