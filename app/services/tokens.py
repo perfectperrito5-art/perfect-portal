@@ -287,33 +287,6 @@ def purchase_token_package(account, device, package, ip_address="", idempotency_
     return access
 
 
-def evaluate_device_awards(account):
-    rules = AwardRule.query.filter_by(rule_type="device_count", is_active=True).all()
-    count = account.devices.filter_by(is_active=True).count()
-    for rule in rules:
-        import json
-        criteria = json.loads(rule.criteria_json or "{}")
-        threshold = max(1, int(criteria.get("device_count", 2)))
-        if count < threshold:
-            continue
-        milestone = count // threshold if rule.repeatable else 1
-        key = f"award:{rule.id}:account:{account.id}:device-threshold:{threshold}:milestone:{milestone}"
-        if AwardGrant.query.filter_by(idempotency_key=key).first():
-            continue
-        grant = AwardGrant(rule_id=rule.id, account_id=account.id,
-                           reward_type=rule.reward_type, reward_amount=rule.reward_amount,
-                           reason_snapshot=f"{rule.name}: reached {threshold} linked devices",
-                           idempotency_key=key)
-        db.session.add(grant)
-        db.session.add(CustomerActivity(account_id=account.id, event_type="award_granted",
-                                         details=grant.reason_snapshot))
-        if rule.reward_type == "tokens":
-            _ledger(account.id, rule.reward_amount, "award",
-                    note=grant.reason_snapshot, reference=key)
-        db.session.commit()
-
-
-
 def evaluate_consecutive_purchase_awards(account, access_session):
     """Evaluate same-package purchase streaks by Tanzania local calendar date."""
     import json
