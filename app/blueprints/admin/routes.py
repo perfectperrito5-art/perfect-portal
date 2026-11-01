@@ -351,7 +351,11 @@ def awards():
                 db.session.commit()
                 flash("Award rule saved.", "success")
         return redirect(url_for("admin.awards"))
-    return render_template("admin/awards.html", rules=AwardRule.query.order_by(AwardRule.created_at.desc()).all(),
+    import json
+    rules = AwardRule.query.order_by(AwardRule.created_at.desc()).all()
+    for rule in rules:
+        rule.form_criteria = json.loads(rule.criteria_json or "{}")
+    return render_template("admin/awards.html", rules=rules,
                            packages=Package.query.filter_by(is_active=True).all())
 
 
