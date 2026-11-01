@@ -711,3 +711,68 @@ body {
  .token-package>b { grid-column:1;grid-row:2;justify-self:start; }
 }
 @media(prefers-reduced-motion:reduce) { .wallet-add,.token-tab,.token-package .btn { transition:none; } }
+
+
+/* One-device customer identity */
+.customer-identity {
+  display: grid;
+  gap: 1rem;
+  margin: 0.85rem 0 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  background: rgba(255,255,255,.055);
+}
+.identity-name-form label,
+.identity-meta span {
+  display: block;
+  color: var(--muted-color, #aab7c4);
+  font-size: .76rem;
+}
+.identity-name-form > div {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+}
+.identity-name-form input {
+  min-width: 0;
+  flex: 1;
+  color: inherit;
+  background: rgba(0,0,0,.16);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 9px;
+  padding: .55rem .7rem;
+  font: inherit;
+}
+.identity-name-form button {
+  border: 0;
+  border-radius: 9px;
+  padding: .58rem .85rem;
+  color: #fff;
+  background: var(--brand-primary, #6d5dfc);
+  font: inherit;
+  cursor: pointer;
+}
+.identity-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: .75rem;
+}
+.identity-meta strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: .82rem;
+  font-weight: 600;
+}
+.identity-meta .reveal-value {
+  border: 0;
+  padding: 0 .2rem;
+  color: var(--brand-accent, #b7a9ff);
+  background: transparent;
+  font: inherit;
+  font-size: .75rem;
+  cursor: pointer;
+}
+@media (max-width: 380px) {
+  .identity-meta { grid-template-columns: 1fr; }
+}
