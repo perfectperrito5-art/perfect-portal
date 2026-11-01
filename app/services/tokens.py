@@ -178,11 +178,13 @@ def evaluate_consecutive_purchase_awards(account, access_session):
             continue
         latest = max(day_package)
         streak = [latest]
-        while len(streak) < required_days and streak[-1] - timedelta(days=1) in day_package:
+        while streak[-1] - timedelta(days=1) in day_package:
             streak.append(streak[-1] - timedelta(days=1))
         if len(streak) < required_days:
             continue
-        key_suffix = latest.isoformat() if rule.repeatable else "first"
+        if rule.repeatable and len(streak) % required_days != 0:
+            continue
+        key_suffix = f"{min(streak).isoformat()}:{len(streak) // required_days}" if rule.repeatable else "first"
         key = f"award:{rule.id}:account:{account.id}:streak:{key_suffix}"
         if AwardGrant.query.filter_by(idempotency_key=key).first():
             continue
