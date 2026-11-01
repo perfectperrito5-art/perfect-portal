@@ -1,14 +1,14 @@
 {% extends "admin/layout.html" %}
-{% block title %}{{ account.username }}{% endblock %}
+{% block title %}{{ account.display_name }}{% endblock %}
 {% block content %}
 <header class="page-header">
-  <div><p class="eyebrow">Customer account</p><h1>{{ account.username }}</h1><p>Created {{ format_local(account.created_at) }} · {{ account.token_balance }} tokens</p></div>
+  <div><p class="eyebrow">Customer account</p><h1>{{ account.display_name }}</h1><p>Customer ID #{{ account.id }} · Internal reference {{ account.username }} · Created {{ format_local(account.created_at) }} · {{ account.token_balance }} tokens</p></div>
   <a class="btn btn-ghost" href="{{ url_for('admin.customers') }}">Back to customers</a>
 </header>
 <section class="card">
   <h2>Registered devices</h2>
   <div class="table-wrap"><table><thead><tr><th>MAC address</th><th>Last IP address</th><th>First seen</th><th>Last seen</th><th>Status</th></tr></thead>
-  <tbody>{% for device in devices %}<tr><td>{{ device.mac_address }}</td><td>{{ device.last_ip_address or "—" }}</td><td>{{ format_local(device.first_seen_at) }}</td><td>{{ format_local(device.last_seen_at) }}</td><td>{{ "Active" if device.is_active else "Unlinked" }}</td></tr>{% else %}<tr><td colspan="5">No devices.</td></tr>{% endfor %}</tbody></table></div>
+  <tbody>{% for device in devices %}<tr><td>{{ device.mac_address }}</td><td>{{ device.last_ip_address or "—" }}</td><td>{{ format_local(device.first_seen_at) }}</td><td>{{ format_local(device.last_seen_at) }}</td><td>{{ "Active" if device.is_active else "Disabled" }}</td></tr>{% else %}<tr><td colspan="5">No devices.</td></tr>{% endfor %}</tbody></table></div>
 </section>
 <section class="card">
   <h2>Internet sessions</h2>
