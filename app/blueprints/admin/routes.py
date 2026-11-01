@@ -307,13 +307,22 @@ def awards():
             rule_type = request.form.get("rule_type")
             reward_type = request.form.get("reward_type")
             amount = request.form.get("reward_amount", type=int)
-            if not name or rule_type not in {"device_count", "consecutive_package_days"} or reward_type not in {"tokens", "minutes"} or not amount or amount < 1:
-                flash("Check the award details.", "warning")
+            package_id = request.form.get("package_id", type=int)
+            invalid_award = (
+                not name
+                or rule_type not in {"device_count", "consecutive_package_days"}
+                or reward_type not in {"tokens", "minutes"}
+                or not amount or amount < 1
+                or (rule_type == "consecutive_package_days" and not package_id)
+                or (rule_type == "device_count" and reward_type != "tokens")
+            )
+            if invalid_award:
+                flash("Device-count awards must grant tokens. Consecutive-purchase awards need a specific package and valid reward.", "warning")
             else:
                 import json
                 criteria = {"device_count": max(1, request.form.get("device_count", type=int) or 2),
                             "consecutive_days": max(2, request.form.get("consecutive_days", type=int) or 3),
-                            "package_id": request.form.get("package_id", type=int)}
+                            "package_id": package_id}
                 if rule is None:
                     rule = AwardRule(name=name, rule_type=rule_type, reward_type=reward_type,
                                      reward_amount=amount, criteria_json=json.dumps(criteria),
