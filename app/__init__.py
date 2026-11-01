@@ -154,6 +154,14 @@ def _bootstrap_db(app: Flask) -> None:
         from app.models.settings import SiteSetting
         if SiteSetting.query.filter_by(key="purchasing_mode").first() is None:
             SiteSetting.set("purchasing_mode", "voucher_payment")
+        if TokenBundle.query.count() == 0:
+            db.session.add_all([
+                TokenBundle(name="Starter", price_tzs=500, token_amount=50, sort_order=1),
+                TokenBundle(name="Standard", price_tzs=1000, token_amount=100, sort_order=2),
+                TokenBundle(name="Plus", price_tzs=3000, token_amount=350, sort_order=3),
+                TokenBundle(name="Value", price_tzs=6000, token_amount=750, sort_order=4),
+            ])
+            db.session.commit()
 
         if not AdminUser.query.filter_by(username=app.config["ADMIN_USERNAME"]).first():
             admin = AdminUser(username=app.config["ADMIN_USERNAME"])
