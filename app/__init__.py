@@ -318,6 +318,14 @@ def _migrate_customer_identity_columns(app: Flask) -> None:
                     "CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_device_one_per_account_idx ON customer_devices (account_id)"
                 ))
 
+    # Keep legacy rule/grant records for audit, but stop obsolete linked-device
+    # rules from being eligible for future rewards.
+    if "award_rules" in tables:
+        with db.engine.begin() as connection:
+            connection.execute(text(
+                "UPDATE award_rules SET is_active = 0 WHERE rule_type = 'device_count'"
+            ))
+
 
 def _migrate_token_columns(app: Flask) -> None:
     """Add token pricing to existing package tables without resetting customer data."""
