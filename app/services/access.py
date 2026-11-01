@@ -140,6 +140,17 @@ def grant_access(
     db.session.add(session)
     db.session.commit()
 
+    # Attach actual network-session activity to the matching customer account.
+    from app.models.customer import CustomerDevice, CustomerActivity
+    device = CustomerDevice.query.filter_by(mac_address=mac_n, is_active=True).first()
+    if device:
+        db.session.add(CustomerActivity(
+            account_id=device.account_id, device_id=device.id,
+            event_type="internet_session_started",
+            details=f"{package.name} · {package.duration_label()}",
+        ))
+        db.session.commit()
+
     if current_app.config.get("GATEWAY_ENABLED"):
         ok = run_gateway("authorize", mac_n, ip or "", str(duration_seconds))
         session.gateway_authorized = ok
@@ -157,6 +168,13 @@ def revoke_session(session: AccessSession, *, reason: str = "admin") -> bool:
     """Revoke DB session AND remove MAC from the live firewall allow-list."""
     session.revoked = True
     session.gateway_authorized = False
+    from app.models.customer import CustomerDevice, CustomerActivity
+    device = CustomerDevice.query.filter_by(mac_address=session.mac_address, is_active=True).first()
+    if device:
+        db.session.add(CustomerActivity(
+            account_id=device.account_id, device_id=device.id,
+            event_type="internet_session_ended", details=f"Session {session.id} revoked ({reason})",
+        ))
     db.session.commit()
 
     ok = True
