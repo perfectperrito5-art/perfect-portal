@@ -151,9 +151,10 @@ def _bootstrap_db(app: Flask) -> None:
 
     with app.app_context():
         db.create_all()
-        _migrate_session_unix_columns(app)
-        _migrate_token_columns(app)
+        # Add every column referenced by ORM queries before running data backfills.
         _migrate_purchase_recovery_columns(app)
+        _migrate_token_columns(app)
+        _migrate_session_unix_columns(app)
         ensure_defaults()
         from app.models.settings import SiteSetting
         if SiteSetting.query.filter_by(key="purchasing_mode").first() is None:
