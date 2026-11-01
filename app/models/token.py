@@ -95,7 +95,7 @@ class PackagePurchaseAttempt(db.Model):
     ip_address = db.Column(db.String(64), nullable=True)
     idempotency_key = db.Column(db.String(80), nullable=False, unique=True)
     status = db.Column(db.String(20), nullable=False, default="pending", index=True)
-    session_id = db.Column(db.Integer, db.ForeignKey("access_sessions.id"), nullable=True, unique=True)
+    session_id = db.Column(db.Integer, nullable=True, unique=True)
     failure_reason = db.Column(db.String(255), nullable=False, default="")
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
     updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
@@ -103,4 +103,3 @@ class PackagePurchaseAttempt(db.Model):
     account = db.relationship("CustomerAccount")
     device = db.relationship("CustomerDevice")
     package = db.relationship("Package")
-    access_session = db.relationship("AccessSession", foreign_keys=[session_id])
