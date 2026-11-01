@@ -266,6 +266,19 @@ def tokens():
                     event_type="tokens_credited", details=f"{purchase.token_amount} tokens credited for {purchase.bundle_name}"))
                 db.session.commit()
                 flash("Bundle verified and tokens credited.", "success")
+        elif action == "bundle_edit":
+            bundle = TokenBundle.query.get_or_404(request.form.get("bundle_id", type=int))
+            name = (request.form.get("name") or "").strip()
+            price = request.form.get("price_tzs", type=int)
+            quantity = request.form.get("token_amount", type=int)
+            if not name or not price or not quantity or price < 1 or quantity < 1:
+                flash("Enter a valid bundle name, price and token amount.", "warning")
+            else:
+                bundle.name = name[:80]
+                bundle.price_tzs = price
+                bundle.token_amount = quantity
+                db.session.commit()
+                flash("Token bundle updated.", "success")
         elif action == "bundle_toggle":
             bundle = TokenBundle.query.get_or_404(request.form.get("bundle_id", type=int))
             bundle.is_active = not bundle.is_active
