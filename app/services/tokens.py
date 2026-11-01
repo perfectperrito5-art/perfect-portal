@@ -161,11 +161,8 @@ def evaluate_device_awards(account):
         db.session.add(CustomerActivity(account_id=account.id, event_type="award_granted",
                                          details=grant.reason_snapshot))
         if rule.reward_type == "tokens":
-            db.session.add(WalletTransaction(
-                account_id=account.id, amount=rule.reward_amount, transaction_type="award",
-                reference=key, note=grant.reason_snapshot,
-            ))
-            account.token_balance += rule.reward_amount
+            _ledger(account.id, rule.reward_amount, "award",
+                    note=grant.reason_snapshot, reference=key)
         db.session.commit()
 
 
