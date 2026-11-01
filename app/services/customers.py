@@ -32,9 +32,17 @@ def get_or_create_device_account(mac_address: str, ip_address: str = ""):
     if device:
         if not device.is_active or not device.account.is_active:
             return device.account, device
-        device.last_ip_address = ip_address or device.last_ip_address
-        device.last_seen_at = _utcnow()
-        db.session.commit()
+        now = _utcnow()
+        # Avoid a database write on every captive-portal refresh. Refresh the
+        # last-seen timestamp at most once per minute, or immediately on IP change.
+        previous_seen = _aware(device.last_seen_at)
+        ip_changed = bool(ip_address and ip_address != device.last_ip_address)
+        stale_seen = not previous_seen or (now - previous_seen) >= timedelta(minutes=1)
+        if ip_changed or stale_seen:
+            if ip_address:
+                device.last_ip_address = ip_address
+            device.last_seen_at = now
+            db.session.commit()
         return device.account, device
 
     # Retry username collisions without exposing a registration form.
