@@ -1,15 +1,19 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from unittest.mock import patch
 
 from app import create_app
 from app.extensions import db
 from app.models.customer import CustomerAccount, CustomerDevice, WalletTransaction
+from app.models.settings import SiteSetting
+from app.services.customers import create_device_link_code, link_device_with_code
 from app.models.package import Package
 from app.models.session import AccessSession
-from app.models.token import AwardRule, AwardGrant, FreeTrialClaim
+from app.models.token import AwardRule, AwardGrant, FreeTrialClaim, PackagePurchaseAttempt
 from app.services.tokens import (
     credit_tokens, debit_tokens, claim_daily_trial,
-    evaluate_consecutive_purchase_awards,
+    evaluate_consecutive_purchase_awards, purchase_token_package,
+    recover_package_purchase_attempt,
 )
 
 
@@ -139,6 +143,84 @@ class TokenSafetyTests(unittest.TestCase):
             evaluate_consecutive_purchase_awards(db.session.get(CustomerAccount, self.account_id), current)
             self.assertEqual(AwardGrant.query.filter_by(rule_id=rule.id).count(), 0)
             self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 100)
+
+
+    def test_competing_debits_cannot_overdraw_wallet(self):
+        with self.app.app_context():
+            debit_tokens(self.account_id, 60, note="first", reference="race:first")
+            with self.assertRaises(ValueError):
+                debit_tokens(self.account_id, 60, note="second", reference="race:second")
+            self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 40)
+
+    def test_interrupted_debit_without_session_is_refunded_once(self):
+        with self.app.app_context():
+            attempt = PackagePurchaseAttempt(
+                account_id=self.account_id, device_id=self.device_id,
+                package_id=self.package_id, package_name="Daily", token_cost=50,
+                mac_address="AA:BB:CC:DD:EE:FF", ip_address="192.168.3.10",
+                idempotency_key="recovery-no-session", status="debited",
+            )
+            db.session.add(attempt)
+            db.session.commit()
+            debit_tokens(self.account_id, 50, note="Daily", reference=f"pkg:{self.account_id}:recovery-no-session")
+            attempt = db.session.get(PackagePurchaseAttempt, attempt.id)
+            self.assertEqual(recover_package_purchase_attempt(attempt), "refunded")
+            self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 100)
+            self.assertEqual(WalletTransaction.query.filter_by(reference=f"refund:pkg:{self.account_id}:recovery-no-session").count(), 1)
+
+    def test_gateway_authorisation_failure_revokes_then_refunds(self):
+        with self.app.app_context():
+            SiteSetting.set("purchasing_mode", "tokens")
+            self.app.config["GATEWAY_ENABLED"] = True
+            from app.services import access as access_service
+            with patch.object(access_service, "run_gateway", return_value=True):
+                with self.assertRaises(ValueError):
+                    purchase_token_package(
+                        db.session.get(CustomerAccount, self.account_id),
+                        db.session.get(CustomerDevice, self.device_id),
+                        db.session.get(Package, self.package_id), "192.168.3.10",
+                        "gateway-failure-test",
+                    )
+            self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 100)
+            attempt = PackagePurchaseAttempt.query.filter_by(idempotency_key="gateway-failure-test").one()
+            self.assertEqual(attempt.status, "refunded")
+
+    def test_duplicate_purchase_request_does_not_debit_twice(self):
+        with self.app.app_context():
+            SiteSetting.set("purchasing_mode", "tokens")
+            device = db.session.get(CustomerDevice, self.device_id)
+            account = db.session.get(CustomerAccount, self.account_id)
+            package = db.session.get(Package, self.package_id)
+            first = purchase_token_package(account, device, package, "192.168.3.10", "same-request")
+            self.assertTrue(first.is_active())
+            with self.assertRaises(ValueError):
+                purchase_token_package(account, device, package, "192.168.3.10", "same-request")
+            self.assertEqual(db.session.get(CustomerAccount, self.account_id).token_balance, 50)
+            self.assertEqual(PackagePurchaseAttempt.query.filter_by(idempotency_key="same-request").count(), 1)
+
+    def test_device_link_code_cannot_be_reused(self):
+        with self.app.app_context():
+            account = db.session.get(CustomerAccount, self.account_id)
+            code = create_device_link_code(account)
+            linked, device = link_device_with_code(code, "12:34:56:78:9A:BC", "192.168.3.11")
+            self.assertEqual(linked.id, self.account_id)
+            self.assertEqual(device.mac_address, "12:34:56:78:9A:BC")
+            with self.assertRaises(ValueError):
+                link_device_with_code(code, "12:34:56:78:9A:BD", "192.168.3.12")
+
+    def test_trial_activation_failure_releases_daily_claim(self):
+        with self.app.app_context():
+            SiteSetting.set("purchasing_mode", "tokens")
+        from app.blueprints.portal import routes as portal_routes
+        from app.services import access as access_service
+        client = self.app.test_client()
+        with patch.object(portal_routes, "_client_mac", return_value="AA:BB:CC:DD:EE:FF"), \
+             patch.object(portal_routes, "_client_ip", return_value="192.168.3.10"), \
+             patch.object(access_service, "grant_access", side_effect=RuntimeError("simulated activation crash")):
+            response = client.post("/tokens/trial")
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            self.assertEqual(FreeTrialClaim.query.count(), 0)
 
 
 if __name__ == "__main__":
