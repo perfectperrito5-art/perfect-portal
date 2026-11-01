@@ -111,6 +111,7 @@ def grant_access(
     ip: str | None = None,
     voucher: Voucher | None = None,
     payment: Payment | None = None,
+    purchase_attempt_id: int | None = None,
 ) -> AccessSession:
     mac_n = normalize_mac(mac) or (mac or "UNKNOWN").upper()
     now = now_utc()
@@ -131,6 +132,7 @@ def grant_access(
         package_id=package.id,
         voucher_id=voucher.id if voucher else None,
         payment_id=payment.id if payment else None,
+        purchase_attempt_id=purchase_attempt_id,
         started_at=now,
         expires_at=expires,
         started_at_unix=started_unix,
