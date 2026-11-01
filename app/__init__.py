@@ -145,13 +145,14 @@ def _register_context(app: Flask) -> None:
 
 
 def _bootstrap_db(app: Flask) -> None:
-    from app.models import AdminUser, Package, TokenBundle, TokenPurchase, FreeTrialClaim, AwardRule, AwardGrant  # noqa: F401
+    from app.models import AdminUser, Package, TokenBundle, TokenPurchase, FreeTrialClaim, AwardRule, AwardGrant, PackagePurchaseAttempt  # noqa: F401
     from app.services.theme import ensure_defaults
 
     with app.app_context():
         db.create_all()
         _migrate_session_unix_columns(app)
         _migrate_token_columns(app)
+        _migrate_purchase_recovery_columns(app)
         ensure_defaults()
         from app.models.settings import SiteSetting
         if SiteSetting.query.filter_by(key="purchasing_mode").first() is None:
@@ -296,3 +297,19 @@ def _migrate_token_columns(app: Flask) -> None:
                 "ALTER TABLE packages ADD COLUMN token_cost INTEGER NOT NULL DEFAULT 0"
             ))
         app.logger.info("Added token_cost to existing packages table.")
+
+
+def _migrate_purchase_recovery_columns(app: Flask) -> None:
+    """Add the nullable session-to-purchase link to existing installations."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "access_sessions" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("access_sessions")}
+    if "purchase_attempt_id" not in columns:
+        with db.engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE access_sessions ADD COLUMN purchase_attempt_id INTEGER"
+            ))
+        app.logger.info("Added purchase_attempt_id to access_sessions.")
