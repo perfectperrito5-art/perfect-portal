@@ -1,0 +1,40 @@
+{% extends "admin/layout.html" %}
+{% block title %}Tokens &amp; purchasing{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Tokens &amp; purchasing</h1><p class="lede">Choose one customer purchasing experience. Existing records remain stored when switching modes.</p></div></div>
+<section class="card">
+  <h2>Purchasing mode</h2>
+  <form method="post" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="mode">
+    <label><input type="radio" name="purchasing_mode" value="voucher_payment" {% if purchasing_mode == 'voucher_payment' %}checked{% endif %}> Voucher + direct payment (current experience)</label>
+    <label><input type="radio" name="purchasing_mode" value="tokens" {% if purchasing_mode == 'tokens' %}checked{% endif %}> Token wallet</label>
+    <button class="btn" type="submit">Save purchasing mode</button>
+  </form>
+</section>
+<section class="card">
+  <h2>Token bundles</h2>
+  <p class="muted">Customers pay the TSh amount and support manually credits the configured token amount after verification.</p>
+  <table><thead><tr><th>Bundle</th><th>Price</th><th>Tokens</th><th>Status</th><th></th></tr></thead><tbody>
+  {% for b in bundles %}<tr><td>{{ b.name }}</td><td>{{ '{:,}'.format(b.price_tzs) }} TZS</td><td>{{ b.token_amount }}</td><td>{{ 'Active' if b.is_active else 'Inactive' }}</td><td><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="bundle_toggle"><input type="hidden" name="bundle_id" value="{{ b.id }}"><button class="linkish">{{ 'Deactivate' if b.is_active else 'Activate' }}</button></form></td></tr>{% else %}<tr><td colspan="5">No bundles configured.</td></tr>{% endfor %}
+  </tbody></table>
+  <h3>Add bundle</h3>
+  <form method="post" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="bundle">
+    <label>Name<input name="name" maxlength="80" required></label>
+    <label>Price (TZS)<input name="price_tzs" type="number" min="1" required></label>
+    <label>Tokens<input name="token_amount" type="number" min="1" required></label>
+    <button class="btn" type="submit">Add bundle</button>
+  </form>
+</section>
+<section class="card">
+  <h2>Manual customer credit</h2>
+  <p class="muted">Use only after confirming the customer's payment. Every credit is recorded against the administrator account.</p>
+  <form method="post" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="credit">
+    <label>Customer ID<input name="account_id" type="number" min="1" required></label>
+    <label>Token amount<input name="amount" type="number" min="1" required></label>
+    <label>Payment reference / note<input name="note" maxlength="255" required></label>
+    <button class="btn" type="submit">Credit wallet</button>
+  </form>
+</section>
+{% endblock %}
