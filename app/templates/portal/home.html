@@ -17,22 +17,20 @@
     <div class="wallet-top"><span>{{ theme.brand_name }}</span></div>
     <div class="wallet-balance">{{ customer_account.token_balance if customer_account else 0 }}</div>
     <div class="wallet-caption">Available Tokens</div>
-    
-  </section>
-  {% if customer_account and customer_device %}
-  <section class="customer-identity" aria-label="Device details">
-    <form method="post" action="{{ url_for('portal.update_customer_name') }}" class="identity-name-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label for="customer-display-name">Name</label>
-      <div><input id="customer-display-name" name="display_name" value="{{ customer_account.display_name }}" maxlength="40" required><button type="submit" aria-label="Save name">Save</button></div>
-    </form>
-    <div class="identity-meta">
-      <div><span>MAC Address</span><strong>{{ customer_device.mac_address }}</strong></div>
-      <div><span>IP Address</span><strong><span class="private-value" data-private-value="{{ customer_device.last_ip_address or 'Not available' }}">••••••••</span> <button class="reveal-value" type="button" aria-label="Show IP address">Show</button></strong></div>
+    {% if customer_account and customer_device %}
+    <div class="customer-identity" aria-label="Device details">
+      <form method="post" action="{{ url_for('portal.update_customer_name') }}" class="identity-name-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="customer-display-name">Name</label>
+        <div><input id="customer-display-name" name="display_name" value="{{ customer_account.display_name }}" maxlength="40" required><button type="submit" aria-label="Save name">Save</button></div>
+      </form>
+      <div class="identity-meta">
+        <div><span>MAC Address</span><strong>{{ customer_device.mac_address }}</strong></div>
+        <div><span>IP Address</span><strong><span class="private-value" data-private-value="{{ customer_device.last_ip_address or 'Not available' }}">••••••••</span> <button class="reveal-value" type="button" aria-label="Show IP address">Show</button></strong></div>
+      </div>
     </div>
+    {% endif %}
   </section>
-  {% endif %}
-
   {% if active_session %}<section class="panel panel-live"><h2>You're online</h2><p>{{ active_session.package.name }} · {{ remaining_label(active_session) }}</p></section>{% endif %}
   <section class="panel token-panel">
     <div class="token-tabs" role="tablist" aria-label="Account sections">
