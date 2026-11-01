@@ -289,6 +289,8 @@ def tokens():
             amount = request.form.get("amount", type=int)
             note = (request.form.get("note") or "").strip()
             try:
+                if not amount or amount < 1:
+                    raise ValueError("Enter a positive token amount.")
                 credit_tokens(account.id, amount, transaction_type="manual_credit",
                               note=note or "Admin token credit", actor_admin_id=current_user.id)
                 db.session.add(CustomerActivity(account_id=account.id, event_type="tokens_credited",
