@@ -269,6 +269,7 @@ def token_free_trial():
                                 sort_order=-100, is_active=False)
         db.session.add(trial_package)
         db.session.commit()
+    from flask import current_app
     claim = None
     access = None
     try:
@@ -276,7 +277,6 @@ def token_free_trial():
         access = __import__("app.services.access", fromlist=["grant_access"]).grant_access(
             package=trial_package, mac=device.mac_address, ip=_client_ip()
         )
-        from flask import current_app
         if current_app.config.get("GATEWAY_ENABLED") and not access.gateway_authorized:
             from app.services.access import revoke_session
             revoke_session(access, reason="trial_gateway_failure")
