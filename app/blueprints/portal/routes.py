@@ -30,8 +30,8 @@ from app.services.customers import (
     create_device_link_code, get_or_create_device_account, link_device_with_code,
 )
 from app.models.customer import CustomerActivity, WalletTransaction
-from app.models.token import TokenBundle, TokenPurchase, AwardGrant
-from app.services.tokens import purchasing_mode, purchase_token_package, claim_daily_trial
+from app.models.token import TokenBundle, TokenPurchase, AwardGrant, FreeTrialClaim
+from app.services.tokens import purchasing_mode, purchase_token_package, claim_daily_trial, local_today
 import re
 import secrets
 from app.services.phone import detect_network
@@ -160,6 +160,7 @@ def home():
     token_bundles = TokenBundle.query.filter_by(is_active=True).order_by(TokenBundle.sort_order, TokenBundle.id).all() if mode == "tokens" else []
     wallet_history = WalletTransaction.query.filter_by(account_id=customer_account.id).order_by(WalletTransaction.created_at.desc()).limit(30).all() if mode == "tokens" and customer_account else []
     award_history = AwardGrant.query.filter_by(account_id=customer_account.id).order_by(AwardGrant.created_at.desc()).limit(20).all() if mode == "tokens" and customer_account else []
+    trial_used_today = bool(mode == "tokens" and customer_account and FreeTrialClaim.query.filter_by(account_id=customer_account.id, local_date=local_today()).first())
     return render_template(
         "portal/home.html",
         packages=packages,
@@ -167,6 +168,7 @@ def home():
         token_bundles=token_bundles,
         wallet_history=wallet_history,
         award_history=award_history,
+        trial_used_today=trial_used_today,
         purchase_nonce=secrets.token_urlsafe(18),
         pay_form=pay_form,
         voucher_form=voucher_form,
