@@ -103,4 +103,4 @@ class PackagePurchaseAttempt(db.Model):
     account = db.relationship("CustomerAccount")
     device = db.relationship("CustomerDevice")
     package = db.relationship("Package")
-    access_session = db.relationship("AccessSession")
+    access_session = db.relationship("AccessSession", foreign_keys=[session_id])
