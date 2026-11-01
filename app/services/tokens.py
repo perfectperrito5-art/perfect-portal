@@ -83,8 +83,9 @@ def _refund_purchase_attempt(attempt, reason):
     from app.services.access import revoke_session
 
     session_row = AccessSession.query.filter_by(purchase_attempt_id=attempt.id).first()
-    if session_row and not session_row.revoked:
+    if session_row:
         from flask import current_app
+        # Retry firewall removal even when the DB row is already revoked.
         revoked = revoke_session(session_row, reason="token_purchase_recovery")
         if current_app.config.get("GATEWAY_ENABLED") and not revoked:
             attempt.status = "recovery_required"
@@ -92,7 +93,7 @@ def _refund_purchase_attempt(attempt, reason):
             db.session.commit()
             return False
 
-    debit_ref = f"pkg:{attempt.account_id}:{attempt.idempotency_key}"
+    debit_ref = f"pkg:{attempt.idempotency_key}"
     debit = WalletTransaction.query.filter_by(reference=debit_ref).first()
     if debit:
         credit_tokens(
@@ -135,9 +136,7 @@ def recover_package_purchase_attempt(attempt):
 
     if current_app.config.get("GATEWAY_ENABLED"):
         if not ensure_gateway_access(session_row):
-            attempt.status = "recovery_required"
-            attempt.failure_reason = "Gateway authorisation is not yet confirmed."
-            db.session.commit()
+            _refund_purchase_attempt(attempt, "Gateway authorisation could not be confirmed")
             return attempt.status
 
     attempt.session_id = session_row.id
@@ -195,7 +194,7 @@ def purchase_token_package(account, device, package, ip_address="", idempotency_
     if not idempotency_key or len(idempotency_key) > 80:
         raise ValueError("Refresh the portal and try your purchase again.")
 
-    existing = PackagePurchaseAttempt.query.filter_by(idempotency_key=idempotency_key).first()
+    existing = PackagePurchaseAttempt.query.filter_by(idempotency_key=attempt_key).first()
     if existing:
         if existing.account_id != account.id or existing.device_id != device.id:
             raise ValueError("This purchase reference belongs to another device.")
@@ -210,7 +209,7 @@ def purchase_token_package(account, device, package, ip_address="", idempotency_
         account_id=account.id, device_id=device.id, package_id=package.id,
         package_name=package.name, token_cost=package.token_cost,
         mac_address=device.mac_address, ip_address=ip_address or "",
-        idempotency_key=idempotency_key, status="pending",
+        idempotency_key=attempt_key, status="pending",
     )
     db.session.add(attempt)
     try:
@@ -228,7 +227,7 @@ def purchase_token_package(account, device, package, ip_address="", idempotency_
         debit_tokens(
             account.id, package.token_cost,
             note=f"Package: {package.name}",
-            reference=f"pkg:{account.id}:{idempotency_key}",
+            reference=f"pkg:{attempt_key}",
         )
         attempt.status = "debited"
         db.session.commit()
