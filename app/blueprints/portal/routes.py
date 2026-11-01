@@ -240,7 +240,7 @@ def token_package_buy(package_id):
 
 
 @bp.route("/tokens/trial", methods=["POST"])
-@limiter.limit("2/day")
+@limiter.limit("5/minute")
 def token_free_trial():
     if purchasing_mode() != "tokens":
         flash("Free trial is unavailable in this purchasing mode.", "warning")
@@ -249,6 +249,10 @@ def token_free_trial():
     account, device = get_or_create_device_account(mac, _client_ip()) if mac else (None, None)
     if not account or not device:
         flash("Could not identify this device.", "warning")
+        return _portal_redirect("/")
+    from app.services.access import find_active_session
+    if find_active_session(device.mac_address):
+        flash("This device already has an active internet session.", "info")
         return _portal_redirect("/")
     trial_package = Package.query.filter_by(name="__ACCOUNT_DAILY_TRIAL__").first()
     if not trial_package:
