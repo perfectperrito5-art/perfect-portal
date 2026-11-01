@@ -32,6 +32,8 @@ jobs:
           from app.extensions import db
           from app.models.settings import SiteSetting
           from app.models.customer import CustomerAccount
+          from app.models.package import Package
+          from app.services.tokens import claim_daily_trial
           app = create_app()
           app.testing = True
           client = app.test_client()
@@ -44,6 +46,26 @@ jobs:
           assert b"Available Tokens" in token_page.data
           assert b"Token Bundles" in token_page.data
           with app.app_context():
-              assert CustomerAccount.query.count() == 1
-          print("Legacy and token-mode portal rendering passed.")
+              account = CustomerAccount.query.one()
+              account.token_balance = 100
+              package = Package(name="CI token package", description="Smoke test",
+                                price_tzs=500, token_cost=10, duration_minutes=60,
+                                sort_order=1, is_active=True)
+              db.session.add(package)
+              db.session.commit()
+              package_id = package.id
+              account_id = account.id
+              claim_daily_trial(account_id)
+              try:
+                  claim_daily_trial(account_id)
+                  raise AssertionError("Daily trial should be unique per account and date.")
+              except ValueError:
+                  pass
+          bought = client.post(f"/tokens/package/{package_id}/buy?mac=AA:BB:CC:DD:EE:FF",
+                               data={"purchase_nonce": "ci-idempotency-nonce"})
+          assert bought.status_code == 302, bought.status_code
+          with app.app_context():
+              account = db.session.get(CustomerAccount, account_id)
+              assert account.token_balance == 90, account.token_balance
+          print("Legacy/token rendering, wallet debit, and daily trial uniqueness passed.")
           PY
