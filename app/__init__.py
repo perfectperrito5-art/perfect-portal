@@ -143,13 +143,17 @@ def _register_context(app: Flask) -> None:
 
 
 def _bootstrap_db(app: Flask) -> None:
-    from app.models import AdminUser, Package  # noqa: F401
+    from app.models import AdminUser, Package, TokenBundle, TokenPurchase, FreeTrialClaim, AwardRule, AwardGrant  # noqa: F401
     from app.services.theme import ensure_defaults
 
     with app.app_context():
         db.create_all()
         _migrate_session_unix_columns(app)
+        _migrate_token_columns(app)
         ensure_defaults()
+        from app.models.settings import SiteSetting
+        if SiteSetting.query.filter_by(key="purchasing_mode").first() is None:
+            SiteSetting.set("purchasing_mode", "voucher_payment")
 
         if not AdminUser.query.filter_by(username=app.config["ADMIN_USERNAME"]).first():
             admin = AdminUser(username=app.config["ADMIN_USERNAME"])
@@ -256,3 +260,18 @@ def _start_session_janitor(app: Flask) -> None:
     timer = threading.Timer(30.0, _tick)
     timer.daemon = True
     timer.start()
+
+def _migrate_token_columns(app: Flask) -> None:
+    """Add token pricing to existing package tables without resetting customer data."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "packages" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("packages")}
+    if "token_cost" not in columns:
+        with db.engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE packages ADD COLUMN token_cost INTEGER NOT NULL DEFAULT 0"
+            ))
+        app.logger.info("Added token_cost to existing packages table.")
