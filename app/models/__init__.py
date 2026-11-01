@@ -11,5 +11,6 @@ from app.models.customer import (
 __all__ = [
     "AdminUser", "Package", "Voucher", "Payment", "AccessSession", "SiteSetting",
     "CustomerAccount", "CustomerDevice", "DeviceLinkCode", "CustomerActivity",
-    "WalletTransaction",
+    "WalletTransaction", "TokenBundle", "TokenPurchase", "FreeTrialClaim",
+    "AwardRule", "AwardGrant",
 ]
