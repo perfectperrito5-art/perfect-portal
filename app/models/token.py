@@ -79,3 +79,28 @@ class AwardGrant(db.Model):
     reason_snapshot = db.Column(db.String(255), nullable=False)
     idempotency_key = db.Column(db.String(120), nullable=False, unique=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+
+
+class PackagePurchaseAttempt(db.Model):
+    """Durable state for a token package purchase and crash recovery."""
+    __tablename__ = "package_purchase_attempts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    account_id = db.Column(db.Integer, db.ForeignKey("customer_accounts.id"), nullable=False, index=True)
+    device_id = db.Column(db.Integer, db.ForeignKey("customer_devices.id"), nullable=False, index=True)
+    package_id = db.Column(db.Integer, db.ForeignKey("packages.id"), nullable=False)
+    package_name = db.Column(db.String(120), nullable=False)
+    token_cost = db.Column(db.Integer, nullable=False)
+    mac_address = db.Column(db.String(32), nullable=False, index=True)
+    ip_address = db.Column(db.String(64), nullable=True)
+    idempotency_key = db.Column(db.String(80), nullable=False, unique=True)
+    status = db.Column(db.String(20), nullable=False, default="pending", index=True)
+    session_id = db.Column(db.Integer, db.ForeignKey("access_sessions.id"), nullable=True, unique=True)
+    failure_reason = db.Column(db.String(255), nullable=False, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+    account = db.relationship("CustomerAccount")
+    device = db.relationship("CustomerDevice")
+    package = db.relationship("Package")
+    access_session = db.relationship("AccessSession")
