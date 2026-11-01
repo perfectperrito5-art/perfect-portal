@@ -38,6 +38,7 @@ class TokenSafetyTests(unittest.TestCase):
         cls.app.testing = True
 
     def setUp(self):
+        self.app.config["GATEWAY_ENABLED"] = False
         with self.app.app_context():
             db.drop_all()
             db.create_all()
