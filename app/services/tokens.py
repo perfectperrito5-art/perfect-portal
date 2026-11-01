@@ -1,5 +1,5 @@
 """Token purchasing, daily trials and award evaluation."""
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 import secrets
 
@@ -171,7 +171,6 @@ def evaluate_device_awards(account):
 def evaluate_consecutive_purchase_awards(account, access_session):
     """Evaluate same-package purchase streaks by Tanzania local calendar date."""
     import json
-    from datetime import timedelta
     from app.models.session import AccessSession
     from app.services.clock import as_utc
 
@@ -224,8 +223,12 @@ def evaluate_consecutive_purchase_awards(account, access_session):
             db.session.add(grant)
         elif rule.reward_type == "minutes":
             extra = rule.reward_amount * 60
-            access_session.expires_at = access_session.expires_at + __import__("datetime").timedelta(seconds=extra)
-            access_session.expires_at_unix = int(access_session.expires_at.timestamp())
+            expires = access_session.expires_at
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            expires = expires + timedelta(seconds=extra)
+            access_session.expires_at = expires
+            access_session.expires_at_unix = int(expires.timestamp())
             db.session.commit()
             from app.services.access import ensure_gateway_access
             ensure_gateway_access(access_session)
