@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
 
+from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
@@ -109,6 +110,16 @@ def link_device_with_code(code: str, mac_address: str, ip_address: str = ""):
     account = db.session.get(CustomerAccount, row.account_id)
     if not account or not account.is_active:
         raise ValueError("This account is unavailable.")
+    consumed = db.session.execute(
+        update(DeviceLinkCode)
+        .where(DeviceLinkCode.id == row.id, DeviceLinkCode.used_at.is_(None),
+               DeviceLinkCode.expires_at > now)
+        .values(used_at=now)
+    )
+    if consumed.rowcount != 1:
+        db.session.rollback()
+        raise ValueError("That linking code has already been used or has expired.")
+    row.used_at = now
     existing = CustomerDevice.query.filter_by(mac_address=normalized).first()
     if existing:
         if existing.account_id == account.id:
@@ -146,7 +157,6 @@ def link_device_with_code(code: str, mac_address: str, ip_address: str = ""):
             last_ip_address=ip_address or None,
         )
         db.session.add(device)
-    row.used_at = now
     db.session.add(device)
     db.session.flush()
     db.session.add(CustomerActivity(
