@@ -37,6 +37,9 @@ class TokenPurchase(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     credited_at = db.Column(db.DateTime, nullable=True)
 
+    account = db.relationship("CustomerAccount")
+    bundle = db.relationship("TokenBundle")
+
 
 class FreeTrialClaim(db.Model):
     __tablename__ = "free_trial_claims"
