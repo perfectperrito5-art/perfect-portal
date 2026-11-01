@@ -115,16 +115,25 @@ def link_device_with_code(code: str, mac_address: str, ip_address: str = ""):
             row.used_at = now
             db.session.commit()
             return account, existing
-        # A fresh visit auto-creates a temporary account for an unrecognised MAC.
-        # It may be absorbed only while empty and within 15 minutes of creation.
+        # A first visit auto-creates a placeholder account for an unrecognised MAC.
+        # It may be merged later only if it has no wallet, trial, purchase, activity,
+        # session, or other device, so no account history is discarded.
         placeholder = existing.account
-        fresh = (now - _aware(placeholder.created_at)) <= timedelta(minutes=15)
         has_wallet = WalletTransaction.query.filter_by(account_id=placeholder.id).first()
         has_other_devices = CustomerDevice.query.filter(
             CustomerDevice.account_id == placeholder.id,
             CustomerDevice.id != existing.id,
         ).first()
-        if not fresh or has_wallet or has_other_devices:
+        has_activity = CustomerActivity.query.filter(
+            CustomerActivity.account_id == placeholder.id,
+            CustomerActivity.event_type != "account_created",
+        ).first()
+        from app.models.token import FreeTrialClaim, TokenPurchase
+        has_trial = FreeTrialClaim.query.filter_by(account_id=placeholder.id).first()
+        has_purchase = TokenPurchase.query.filter_by(account_id=placeholder.id).first()
+        from app.models.session import AccessSession
+        has_session = AccessSession.query.filter_by(mac_address=normalized).first()
+        if has_wallet or has_other_devices or has_activity or has_trial or has_purchase or has_session:
             raise ValueError("This device is already linked to another account.")
         existing.account_id = account.id
         existing.last_ip_address = ip_address or existing.last_ip_address
