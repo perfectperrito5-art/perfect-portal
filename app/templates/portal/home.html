@@ -17,7 +17,7 @@
     <div class="wallet-top"><span>{{ theme.brand_name }}</span></div>
     <div class="wallet-balance">{{ customer_account.token_balance if customer_account else 0 }}</div>
     <div class="wallet-caption">Available Tokens</div>
-    <button class="wallet-add" type="button" data-token-tab-trigger="tokens">Add Tokens</button>
+    <button class="wallet-add" type="button" data-open-support>Add Tokens</button>
   </section>
   {% if customer_account and customer_device %}
   <section class="panel account-panel">
