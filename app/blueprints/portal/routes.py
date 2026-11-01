@@ -295,12 +295,18 @@ def token_bundle_request(bundle_id):
     account, _device = get_or_create_device_account(_client_mac(), _client_ip())
     bundle = TokenBundle.query.filter_by(id=bundle_id, is_active=True).first_or_404()
     if account:
-        db.session.add(TokenPurchase(account_id=account.id, bundle_id=bundle.id,
-                                     bundle_name=bundle.name, price_tzs=bundle.price_tzs,
-                                     token_amount=bundle.token_amount, status="contact_support"))
-        db.session.add(CustomerActivity(account_id=account.id, event_type="token_bundle_requested",
-                                         details=f"Requested {bundle.name} bundle; pending support verification"))
-        db.session.commit()
+        pending = TokenPurchase.query.filter_by(account_id=account.id, bundle_id=bundle.id,
+                                                status="contact_support").first()
+        if not pending:
+            db.session.add(TokenPurchase(account_id=account.id, bundle_id=bundle.id,
+                                         bundle_name=bundle.name, price_tzs=bundle.price_tzs,
+                                         token_amount=bundle.token_amount, status="contact_support"))
+            db.session.add(CustomerActivity(account_id=account.id, event_type="token_bundle_requested",
+                                             details=f"Requested {bundle.name} bundle; pending support verification"))
+            db.session.commit()
+        else:
+            flash("You already have a request for this bundle awaiting support verification.", "info")
+            return _portal_redirect("/")
     flash("Contact support to complete payment and have tokens credited to your account.", "info")
     return _portal_redirect("/")
 
