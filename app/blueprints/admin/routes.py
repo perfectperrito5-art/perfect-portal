@@ -35,7 +35,7 @@ from app.models.session import AccessSession
 from app.models.voucher import Voucher
 from app.models.customer import CustomerAccount, CustomerDevice, CustomerActivity, WalletTransaction
 from app.models.settings import SiteSetting
-from app.models.token import TokenBundle, AwardRule
+from app.models.token import TokenBundle, TokenPurchase, AwardRule
 from app.services.tokens import credit_tokens
 from app.services.access import revoke_expired_sessions, revoke_session
 from app.services.clock import duration_to_minutes, minutes_to_amount_unit
@@ -245,6 +245,23 @@ def tokens():
                 db.session.add(TokenBundle(name=name[:80], price_tzs=price, token_amount=quantity))
                 db.session.commit()
                 flash("Token bundle created.", "success")
+        elif action == "credit_request":
+            purchase = TokenPurchase.query.get_or_404(request.form.get("purchase_id", type=int))
+            if purchase.status == "credited":
+                flash("This request has already been credited.", "info")
+            else:
+                credit_tokens(purchase.account_id, purchase.token_amount,
+                              transaction_type="token_bundle_purchase",
+                              note=f"{purchase.bundle_name} · {purchase.price_tzs} TZS · {request.form.get('payment_reference','')}",
+                              actor_admin_id=current_user.id,
+                              reference=f"bundle-purchase:{purchase.id}")
+                purchase.status = "credited"
+                purchase.payment_reference = (request.form.get("payment_reference") or "")[:100]
+                purchase.credited_at = datetime.now(timezone.utc)
+                db.session.add(CustomerActivity(account_id=purchase.account_id,
+                    event_type="tokens_credited", details=f"{purchase.token_amount} tokens credited for {purchase.bundle_name}"))
+                db.session.commit()
+                flash("Bundle verified and tokens credited.", "success")
         elif action == "bundle_toggle":
             bundle = TokenBundle.query.get_or_404(request.form.get("bundle_id", type=int))
             bundle.is_active = not bundle.is_active
@@ -265,7 +282,8 @@ def tokens():
                 flash(str(exc), "warning")
         return redirect(url_for("admin.tokens"))
     bundles = TokenBundle.query.order_by(TokenBundle.sort_order, TokenBundle.id).all()
-    return render_template("admin/tokens.html", bundles=bundles,
+    requests_pending = TokenPurchase.query.filter(TokenPurchase.status != "credited").order_by(TokenPurchase.created_at.asc()).limit(100).all()
+    return render_template("admin/tokens.html", bundles=bundles, requests_pending=requests_pending,
                            purchasing_mode=SiteSetting.get("purchasing_mode", "voucher_payment"))
 
 
