@@ -139,3 +139,65 @@ def evaluate_device_awards(account):
             ))
             account.token_balance += rule.reward_amount
         db.session.commit()
+
+
+
+def evaluate_consecutive_purchase_awards(account, access_session):
+    """Evaluate same-package purchase streaks by Tanzania local calendar date."""
+    import json
+    from datetime import timedelta
+    from app.models.session import AccessSession
+    from app.services.clock import as_utc
+
+    device_macs = [d.mac_address for d in account.devices.filter_by(is_active=True).all()]
+    if not device_macs:
+        return
+    rules = AwardRule.query.filter_by(rule_type="consecutive_package_days", is_active=True).all()
+    for rule in rules:
+        criteria = json.loads(rule.criteria_json or "{}")
+        required_days = max(2, int(criteria.get("consecutive_days", 3)))
+        required_package = criteria.get("package_id")
+        query = AccessSession.query.filter(
+            AccessSession.mac_address.in_(device_macs),
+            AccessSession.revoked.is_(False),
+        ).order_by(AccessSession.started_at.desc()).limit(500)
+        sessions = query.all()
+        day_package = {}
+        for item in sessions:
+            if required_package and item.package_id != int(required_package):
+                continue
+            stamp = as_utc(item.started_at)
+            if stamp:
+                local_day = stamp.astimezone(LOCAL_TZ).date()
+                day_package.setdefault(local_day, item)
+        if not day_package:
+            continue
+        latest = max(day_package)
+        streak = [latest]
+        while len(streak) < required_days and streak[-1] - timedelta(days=1) in day_package:
+            streak.append(streak[-1] - timedelta(days=1))
+        if len(streak) < required_days:
+            continue
+        key_suffix = latest.isoformat() if rule.repeatable else "first"
+        key = f"award:{rule.id}:account:{account.id}:streak:{key_suffix}"
+        if AwardGrant.query.filter_by(idempotency_key=key).first():
+            continue
+        grant = AwardGrant(
+            rule_id=rule.id, account_id=account.id, reward_type=rule.reward_type,
+            reward_amount=rule.reward_amount,
+            reason_snapshot=f"{rule.name}: {required_days} consecutive qualifying purchase days",
+            idempotency_key=key,
+        )
+        db.session.add(grant)
+        if rule.reward_type == "tokens":
+            _ledger(account.id, rule.reward_amount, "award",
+                    note=grant.reason_snapshot, reference=key)
+            db.session.add(grant)
+        elif rule.reward_type == "minutes":
+            extra = rule.reward_amount * 60
+            access_session.expires_at = access_session.expires_at + __import__("datetime").timedelta(seconds=extra)
+            access_session.expires_at_unix = int(access_session.expires_at.timestamp())
+            db.session.commit()
+            from app.services.access import ensure_gateway_access
+            ensure_gateway_access(access_session)
+        db.session.commit()
