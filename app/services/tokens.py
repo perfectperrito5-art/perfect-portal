@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models.customer import CustomerAccount, WalletTransaction, CustomerActivity
-from app.models.token import FreeTrialClaim, TokenBundle, TokenPurchase, AwardRule, AwardGrant
+from app.models.token import FreeTrialClaim, TokenBundle, TokenPurchase, AwardRule, AwardGrant, PackagePurchaseAttempt
 
 LOCAL_TZ = ZoneInfo("Africa/Dar_es_Salaam")
 
@@ -77,16 +77,116 @@ def claim_daily_trial(account_id, device_id=None):
     return claim
 
 
+def _refund_purchase_attempt(attempt, reason):
+    """Compensate a committed debit exactly once and close the attempt."""
+    from app.models.session import AccessSession
+    from app.services.access import revoke_session
+
+    session_row = AccessSession.query.filter_by(purchase_attempt_id=attempt.id).first()
+    if session_row and not session_row.revoked:
+        from flask import current_app
+        revoked = revoke_session(session_row, reason="token_purchase_recovery")
+        if current_app.config.get("GATEWAY_ENABLED") and not revoked:
+            attempt.status = "recovery_required"
+            attempt.failure_reason = (reason or "Gateway revoke is not confirmed")[:255]
+            db.session.commit()
+            return False
+
+    debit_ref = f"pkg:{attempt.account_id}:{attempt.idempotency_key}"
+    debit = WalletTransaction.query.filter_by(reference=debit_ref).first()
+    if debit:
+        credit_tokens(
+            attempt.account_id, attempt.token_cost,
+            transaction_type="purchase_refund",
+            note=f"Refund: {reason or 'purchase could not be completed'}",
+            reference=f"refund:{debit_ref}",
+        )
+    attempt.status = "refunded"
+    attempt.failure_reason = (reason or "Purchase was not completed")[:255]
+    db.session.commit()
+    return True
+
+
+def recover_package_purchase_attempt(attempt):
+    """Reconcile one interrupted purchase using its durable session/debit links."""
+    from flask import current_app
+    from app.models.session import AccessSession
+    from app.services.access import ensure_gateway_access
+
+    if attempt.status in {"completed", "refunded", "failed"}:
+        return attempt.status
+
+    debit_ref = f"pkg:{attempt.account_id}:{attempt.idempotency_key}"
+    debit = WalletTransaction.query.filter_by(reference=debit_ref).first()
+    if not debit:
+        attempt.status = "failed"
+        attempt.failure_reason = "No committed wallet debit exists."
+        db.session.commit()
+        return attempt.status
+
+    session_row = AccessSession.query.filter_by(purchase_attempt_id=attempt.id).first()
+    if not session_row:
+        _refund_purchase_attempt(attempt, "Application stopped before creating the internet session")
+        return attempt.status
+
+    if not session_row.is_active():
+        _refund_purchase_attempt(attempt, "Internet session expired before purchase recovery")
+        return attempt.status
+
+    if current_app.config.get("GATEWAY_ENABLED"):
+        if not ensure_gateway_access(session_row):
+            attempt.status = "recovery_required"
+            attempt.failure_reason = "Gateway authorisation is not yet confirmed."
+            db.session.commit()
+            return attempt.status
+
+    attempt.session_id = session_row.id
+    attempt.status = "completed"
+    attempt.failure_reason = ""
+    db.session.add(CustomerActivity(
+        account_id=attempt.account_id, device_id=attempt.device_id,
+        event_type="package_purchased",
+        details=f"{attempt.package_name} purchased for {attempt.token_cost} tokens",
+    ))
+    db.session.commit()
+    return attempt.status
+
+
+def recover_pending_package_purchases(limit=100):
+    """Recover incomplete token purchases after startup or scheduled reconciliation."""
+    attempts = PackagePurchaseAttempt.query.filter(
+        PackagePurchaseAttempt.status.in_(("pending", "debited", "activating", "recovery_required"))
+    ).order_by(PackagePurchaseAttempt.created_at.asc()).limit(max(1, min(int(limit), 500))).all()
+    results = {"completed": 0, "refunded": 0, "failed": 0, "recovery_required": 0}
+    for attempt in attempts:
+        try:
+            status = recover_package_purchase_attempt(attempt)
+            results[status] = results.get(status, 0) + 1
+        except Exception:
+            db.session.rollback()
+            attempt = db.session.get(PackagePurchaseAttempt, attempt.id)
+            if attempt:
+                attempt.status = "recovery_required"
+                attempt.failure_reason = "Recovery encountered an unexpected error."
+                db.session.commit()
+                results["recovery_required"] += 1
+            from flask import current_app
+            current_app.logger.exception("Purchase recovery failed for attempt %s", attempt.id if attempt else "unknown")
+    return results
+
+
 def purchase_token_package(account, device, package, ip_address="", idempotency_key=""):
-    """Deduct once, grant access, and compensate if firewall authorisation fails."""
+    """Create a durable purchase intent before debiting, then recover safely."""
+    from flask import current_app
     from app.services.access import grant_access, revoke_session
-    from app.models.customer import CustomerActivity
-    from app.models.token import AwardRule
+    from app.models.session import AccessSession
 
     if purchasing_mode() != "tokens":
         raise ValueError("Token purchasing is currently disabled.")
     if not account or not account.is_active or not device or not device.is_active:
         raise ValueError("Customer account or device unavailable.")
+    if device.account_id != account.id:
+        raise ValueError("This device does not belong to the selected account.")
     from app.services.access import find_active_session
     if find_active_session(device.mac_address):
         raise ValueError("This device already has an active internet session.")
@@ -94,48 +194,89 @@ def purchase_token_package(account, device, package, ip_address="", idempotency_
         raise ValueError("This package is unavailable.")
     if not idempotency_key or len(idempotency_key) > 80:
         raise ValueError("Refresh the portal and try your purchase again.")
-    ref = f"pkg:{account.id}:{idempotency_key}"
-    previous = WalletTransaction.query.filter_by(reference=ref).first()
-    if previous:
-        if previous.amount < 0:
-            from app.models.session import AccessSession
-            previous_session = AccessSession.query.filter_by(
-                mac_address=device.mac_address, package_id=package.id, revoked=False
-            ).order_by(AccessSession.started_at.desc()).first()
-            if previous_session and previous_session.is_active():
-                return previous_session
-        raise ValueError("This purchase request has already been processed. Refresh the portal before trying again.")
-    debit_tokens(account.id, package.token_cost, note=f"Package: {package.name}", reference=ref)
-    access = None
+
+    existing = PackagePurchaseAttempt.query.filter_by(idempotency_key=idempotency_key).first()
+    if existing:
+        if existing.account_id != account.id or existing.device_id != device.id:
+            raise ValueError("This purchase reference belongs to another device.")
+        status = recover_package_purchase_attempt(existing)
+        if status == "completed":
+            session_row = AccessSession.query.filter_by(purchase_attempt_id=existing.id).first()
+            if session_row:
+                return session_row
+        raise ValueError("This purchase request is being recovered or has already been processed. Please refresh shortly.")
+
+    attempt = PackagePurchaseAttempt(
+        account_id=account.id, device_id=device.id, package_id=package.id,
+        package_name=package.name, token_cost=package.token_cost,
+        mac_address=device.mac_address, ip_address=ip_address or "",
+        idempotency_key=idempotency_key, status="pending",
+    )
+    db.session.add(attempt)
     try:
-        access = grant_access(package=package, mac=device.mac_address, ip=ip_address)
-        from flask import current_app
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        existing = PackagePurchaseAttempt.query.filter_by(idempotency_key=idempotency_key).first()
+        if existing and existing.account_id == account.id and existing.device_id == device.id:
+            status = recover_package_purchase_attempt(existing)
+            if status == "completed":
+                return AccessSession.query.filter_by(purchase_attempt_id=existing.id).one()
+        raise ValueError("This purchase request is already being processed.")
+
+    try:
+        debit_tokens(
+            account.id, package.token_cost,
+            note=f"Package: {package.name}",
+            reference=f"pkg:{account.id}:{idempotency_key}",
+        )
+        attempt.status = "debited"
+        db.session.commit()
+
+        attempt.status = "activating"
+        db.session.commit()
+        access = grant_access(
+            package=package, mac=device.mac_address, ip=ip_address,
+            purchase_attempt_id=attempt.id,
+        )
+        attempt.session_id = access.id
+        db.session.commit()
+
         if current_app.config.get("GATEWAY_ENABLED") and not access.gateway_authorized:
-            revoke_session(access, reason="token_purchase_gateway_failure")
-            credit_tokens(account.id, package.token_cost, transaction_type="purchase_refund",
-                          note=f"Refund: gateway authorisation failed for {package.name}",
-                          reference=f"refund:{ref}")
-            raise ValueError("Wi-Fi could not be activated. Your tokens have been returned.")
+            revoked = revoke_session(access, reason="token_purchase_gateway_failure")
+            if revoked:
+                _refund_purchase_attempt(attempt, "Gateway authorisation failed")
+                raise ValueError("Wi-Fi could not be activated. Your tokens have been returned.")
+            attempt.status = "recovery_required"
+            attempt.failure_reason = "Gateway authorisation failed and revoke is unconfirmed."
+            db.session.commit()
+            raise ValueError("Wi-Fi activation is being checked. Your tokens have not been refunded yet.")
+
+        attempt.status = "completed"
         db.session.add(CustomerActivity(
             account_id=account.id, device_id=device.id, event_type="package_purchased",
             details=f"{package.name} purchased for {package.token_cost} tokens",
         ))
         db.session.commit()
-    except Exception:
-        # Never leave a successfully authorised session running after a
-        # compensating refund.
-        if access is not None and not access.revoked:
-            revoke_session(access, reason="token_purchase_rollback")
-        if not WalletTransaction.query.filter_by(reference=f"refund:{ref}").first():
-            credit_tokens(account.id, package.token_cost, transaction_type="purchase_refund",
-                          note="Refund after package activation error", reference=f"refund:{ref}")
+    except ValueError:
         raise
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Token purchase interrupted for attempt %s", attempt.id)
+        # Do not guess whether the gateway granted access. Leave a durable
+        # recovery state; the reconciler will inspect the linked session and
+        # either restore access or safely revoke/refund.
+        attempt = db.session.get(PackagePurchaseAttempt, attempt.id)
+        if attempt and attempt.status not in {"completed", "refunded"}:
+            attempt.status = "recovery_required"
+            attempt.failure_reason = "Purchase interrupted; automatic recovery is pending."
+            db.session.commit()
+        raise ValueError("The purchase was interrupted and is being safely recovered. Please refresh shortly.")
 
     try:
         evaluate_consecutive_purchase_awards(account, access)
     except Exception:
         db.session.rollback()
-        from flask import current_app
         current_app.logger.exception("Could not evaluate purchase awards for account %s", account.id)
     return access
 
