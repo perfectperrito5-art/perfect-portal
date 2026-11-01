@@ -36,13 +36,26 @@ def credit_tokens(account_id: int, amount: int, *, transaction_type: str,
     account = db.session.get(CustomerAccount, account_id)
     if not account or not account.is_active:
         raise ValueError("Customer account is unavailable.")
-    account.token_balance = CustomerAccount.token_balance + amount
+    result = db.session.execute(
+        update(CustomerAccount)
+        .where(CustomerAccount.id == account_id, CustomerAccount.is_active.is_(True))
+        .values(token_balance=CustomerAccount.token_balance + amount)
+    )
+    if result.rowcount != 1:
+        db.session.rollback()
+        raise ValueError("Customer account is unavailable.")
     db.session.add(WalletTransaction(
         account_id=account_id, amount=amount, transaction_type=transaction_type,
         reference=ref, note=note[:255], actor_admin_id=actor_admin_id,
     ))
-    db.session.commit()
-    db.session.refresh(account)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        existing = WalletTransaction.query.filter_by(reference=ref).first()
+        if existing:
+            return existing
+        raise
     return WalletTransaction.query.filter_by(reference=ref).one()
 
 
