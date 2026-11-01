@@ -7,6 +7,7 @@ from app.models.settings import SiteSetting
 from app.models.customer import (
     CustomerAccount, CustomerDevice, DeviceLinkCode, CustomerActivity, WalletTransaction,
 )
+from app.models.token import TokenBundle, TokenPurchase, FreeTrialClaim, AwardRule, AwardGrant
 
 __all__ = [
     "AdminUser", "Package", "Voucher", "Payment", "AccessSession", "SiteSetting",
