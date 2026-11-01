@@ -115,6 +115,7 @@ def link_device_with_code(code: str, mac_address: str, ip_address: str = ""):
         .where(DeviceLinkCode.id == row.id, DeviceLinkCode.used_at.is_(None),
                DeviceLinkCode.expires_at > now)
         .values(used_at=now)
+        .execution_options(synchronize_session=False)
     )
     if consumed.rowcount != 1:
         db.session.rollback()
