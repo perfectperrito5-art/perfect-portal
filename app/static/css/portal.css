@@ -606,3 +606,48 @@ body {
 .account-devices .btn-ghost { margin-top:0; }
 .link-device-form { padding-top:.6rem; border-top:1px solid rgba(15,23,42,.08); }
 
+
+/* Token wallet mode — theme-driven, with the reference's layered wallet treatment. */
+.token-wallet {
+  position: relative; overflow: hidden; isolation: isolate;
+  padding: 1.2rem 1.35rem 1.55rem; margin-bottom: 1rem; border-radius: 25px;
+  color: #fff;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--brand-primary) 88%, #8b5cf6), var(--brand-primary) 70%, color-mix(in srgb, var(--brand-primary) 68%, #1e1b4b));
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--brand-primary) 28%, transparent);
+}
+.token-wallet::before,.token-wallet::after { content:""; position:absolute; z-index:-1; border-radius:50%; pointer-events:none; }
+.token-wallet::before { width:85%; height:95%; right:-20%; top:-55%; background:rgba(255,255,255,.09); transform:rotate(-18deg); }
+.token-wallet::after { width:120%; height:65%; left:-22%; bottom:-48%; background:rgba(255,255,255,.1); transform:rotate(8deg); }
+.wallet-top { display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:1.08rem; }
+.wallet-bell { width:2rem;height:2rem;border:1.5px solid rgba(255,255,255,.65);border-radius:50%;display:grid;place-items:center; }
+.wallet-balance { text-align:center; font-size:clamp(3.1rem,13vw,4.5rem); font-weight:800; line-height:1.1; margin-top:1.15rem; font-variant-numeric:tabular-nums; }
+.wallet-caption { text-align:center; font-size:1rem; opacity:.9; }
+.token-panel { padding:1.1rem; }
+.token-tabs { display:grid; grid-template-columns:repeat(3,1fr); gap:.2rem; padding:.25rem; margin-bottom:1.15rem; border:1px solid color-mix(in srgb,var(--brand-primary) 16%,transparent); border-radius:999px; }
+.token-tab { border:0; border-radius:999px; background:transparent; padding:.65rem .3rem; color:var(--brand-muted); font:inherit; font-weight:700; cursor:pointer; }
+.token-tab.is-active { color:var(--brand-primary); background:color-mix(in srgb,var(--brand-primary) 11%,white); box-shadow:0 3px 12px rgba(15,23,42,.07); }
+.token-tab-panel h2 { font-family:inherit; font-size:1.15rem; margin:0 0 .8rem; }
+.token-package-list { display:grid; gap:.65rem; }
+.token-package { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:.75rem; align-items:center; padding:.8rem .85rem; border-radius:17px; background:color-mix(in srgb,var(--brand-primary) 4%,white); border:1px solid color-mix(in srgb,var(--brand-primary) 9%,transparent); }
+.token-package > div { display:grid; min-width:0; }
+.token-package > div strong { font-size:.96rem; }
+.token-package > div span { color:var(--brand-muted); font-size:.84rem; }
+.token-package > b { color:var(--brand-primary); font-size:.9rem; white-space:nowrap; }
+.token-package form { margin:0; }
+.token-package .btn { padding:.58rem .9rem; border-radius:999px; font-size:.88rem; }
+.token-package .btn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+.trial-form { margin-bottom:.8rem; }
+.trial-form .btn { width:100%; margin:0; }
+.wallet-history { display:grid; }
+.wallet-history-row { display:flex; justify-content:space-between; align-items:center; gap:.8rem; padding:.75rem 0; border-bottom:1px solid color-mix(in srgb,var(--brand-primary) 10%,transparent); }
+.wallet-history-row > div { display:grid; min-width:0; }
+.wallet-history-row small { color:var(--brand-muted); overflow-wrap:anywhere; }
+.wallet-history-row b { font-variant-numeric:tabular-nums; }
+.wallet-history-row .credit { color:#15803d; }.wallet-history-row .debit { color:#b45309; }
+.support-help { border:0; background:transparent; color:var(--brand-primary); font:inherit; font-weight:700; padding:.9rem 0 .1rem; cursor:pointer; }
+.support-dialog { border:0; border-radius:24px; padding:0; width:min(430px,calc(100% - 2rem)); color:var(--brand-text); box-shadow:0 25px 80px rgba(15,23,42,.3); }
+.support-dialog::backdrop { background:rgba(15,23,42,.48); backdrop-filter:blur(4px); }
+.support-dialog-head { display:flex; justify-content:space-between; align-items:center; padding:1rem 1.2rem; color:white; background:var(--brand-primary); font-size:1.1rem; }
+.support-dialog-head button { border:0;background:transparent;color:inherit;font-size:1.7rem;cursor:pointer; }
+.support-dialog-body { padding:1.25rem; }.support-dialog-body p { margin:0 0 1rem; color:var(--brand-muted); }
+@media(max-width:420px){.token-package{grid-template-columns:minmax(0,1fr) auto;}.token-package form{grid-column:1/-1}.token-package .btn{width:100%;}}
