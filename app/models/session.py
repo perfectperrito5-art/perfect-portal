@@ -12,6 +12,7 @@ class AccessSession(db.Model):
     package_id = db.Column(db.Integer, db.ForeignKey("packages.id"), nullable=False)
     voucher_id = db.Column(db.Integer, db.ForeignKey("vouchers.id"), nullable=True)
     payment_id = db.Column(db.Integer, db.ForeignKey("payments.id"), nullable=True)
+    purchase_attempt_id = db.Column(db.Integer, db.ForeignKey("package_purchase_attempts.id"), nullable=True, index=True)
     started_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -25,6 +26,7 @@ class AccessSession(db.Model):
     package = db.relationship("Package")
     voucher = db.relationship("Voucher")
     payment = db.relationship("Payment")
+    purchase_attempt = db.relationship("PackagePurchaseAttempt", foreign_keys=[purchase_attempt_id])
 
     def is_active(self) -> bool:
         if self.revoked:
