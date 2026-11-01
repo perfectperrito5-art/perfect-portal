@@ -12,7 +12,7 @@
 <table>
   <thead>
     <tr>
-      <th>Name</th><th>Price</th><th>Duration</th><th>Active</th><th></th>
+      <th>Name</th><th>Price</th><th>Token cost</th><th>Duration</th><th>Active</th><th></th>
     </tr>
   </thead>
   <tbody>
@@ -23,6 +23,7 @@
         {% if p.description %}<div class="muted">{{ p.description }}</div>{% endif %}
       </td>
       <td>{{ '{:,}'.format(p.price_tzs) }} TZS</td>
+      <td>{{ p.token_cost }} tokens</td>
       <td>{{ p.duration_label() }} <span class="muted">({{ p.duration_minutes }} min)</span></td>
       <td>{{ 'Yes' if p.is_active else 'No' }}</td>
       <td class="actions">
@@ -34,7 +35,7 @@
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="5">No packages yet.</td></tr>
+    <tr><td colspan="6">No packages yet.</td></tr>
     {% endfor %}
   </tbody>
 </table>
