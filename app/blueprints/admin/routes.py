@@ -50,6 +50,7 @@ class PackageForm(FlaskForm):
     price_tzs = IntegerField(
         "Price (TZS)", validators=[DataRequired(), NumberRange(min=100, max=5_000_000)]
     )
+    token_cost = IntegerField("Token cost", default=0, validators=[Optional(), NumberRange(min=0, max=10_000_000)])
     duration_minutes = IntegerField(
         "Duration (minutes)",
         validators=[Optional(), NumberRange(min=1, max=525_600)],
@@ -324,6 +325,7 @@ def package_new():
             name=form.name.data.strip(),
             description=(form.description.data or "").strip(),
             price_tzs=form.price_tzs.data,
+            token_cost=form.token_cost.data or 0,
             duration_minutes=_minutes_from_package_form(form),
             sort_order=form.sort_order.data or 0,
             is_active=bool(form.is_active.data),
@@ -346,6 +348,7 @@ def package_edit(package_id: int):
         pkg.name = form.name.data.strip()
         pkg.description = (form.description.data or "").strip()
         pkg.price_tzs = form.price_tzs.data
+        pkg.token_cost = form.token_cost.data or 0
         pkg.duration_minutes = _minutes_from_package_form(form)
         pkg.sort_order = form.sort_order.data or 0
         pkg.is_active = bool(form.is_active.data)
