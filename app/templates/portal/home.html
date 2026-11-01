@@ -12,6 +12,12 @@
     {% if theme.tagline %}<p class="brand-tag">{{ theme.tagline }}</p>{% endif %}
   </header>
 
+  {% if purchasing_mode == 'tokens' %}
+  <section class="token-wallet">
+    <div class="wallet-top"><span>{{ theme.brand_name }}</span><span class="wallet-bell" aria-hidden="true">◦</span></div>
+    <div class="wallet-balance">{{ customer_account.token_balance if customer_account else 0 }}</div>
+    <div class="wallet-caption">Available Tokens</div>
+  </section>
   {% if customer_account and customer_device %}
   <section class="panel account-panel">
     <div class="account-heading">
@@ -60,12 +66,6 @@
   </section>
   {% endif %}
 
-  {% if purchasing_mode == 'tokens' %}
-  <section class="token-wallet">
-    <div class="wallet-top"><span>{{ theme.brand_name }}</span><span class="wallet-bell" aria-hidden="true">◦</span></div>
-    <div class="wallet-balance">{{ customer_account.token_balance if customer_account else 0 }}</div>
-    <div class="wallet-caption">Available Tokens</div>
-  </section>
   {% if active_session %}<section class="panel panel-live"><h2>You're online</h2><p>{{ active_session.package.name }} · {{ remaining_label(active_session) }}</p></section>{% endif %}
   <section class="panel token-panel">
     <div class="token-tabs" role="tablist">
