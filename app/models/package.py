@@ -10,6 +10,7 @@ class Package(db.Model):
     name = db.Column(db.String(120), nullable=False)
     description = db.Column(db.String(500), default="")
     price_tzs = db.Column(db.Integer, nullable=False)
+    token_cost = db.Column(db.Integer, nullable=False, default=0)
     duration_minutes = db.Column(db.Integer, nullable=False)
     sort_order = db.Column(db.Integer, default=0, nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
