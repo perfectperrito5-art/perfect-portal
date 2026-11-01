@@ -8,6 +8,7 @@ import re
 import subprocess
 
 from datetime import datetime, timezone
+from sqlalchemy import and_, or_
 
 from flask import current_app
 
@@ -193,7 +194,14 @@ def revoke_session(session: AccessSession, *, reason: str = "admin") -> bool:
 
 def revoke_expired_sessions() -> int:
     now = now_unix()
-    sessions = AccessSession.query.filter_by(revoked=False).all()
+    now_dt = datetime.now(timezone.utc)
+    sessions = AccessSession.query.filter(
+        AccessSession.revoked.is_(False),
+        or_(
+            AccessSession.expires_at_unix <= now,
+            and_(AccessSession.expires_at_unix.is_(None), AccessSession.expires_at <= now_dt),
+        ),
+    ).all()
     count = 0
     for s in sessions:
         if session_expires_unix(s) <= now:
