@@ -151,6 +151,8 @@ def _bootstrap_db(app: Flask) -> None:
 
     with app.app_context():
         db.create_all()
+        # Bring customer identity schema forward without replacing existing records.
+        _migrate_customer_identity_columns(app)
         # Add every column referenced by ORM queries before running data backfills.
         _migrate_purchase_recovery_columns(app)
         _migrate_token_columns(app)
@@ -286,6 +288,36 @@ def _start_session_janitor(app: Flask) -> None:
     timer = threading.Timer(expiry_interval, _tick)
     timer.daemon = True
     timer.start()
+
+def _migrate_customer_identity_columns(app: Flask) -> None:
+    """Add display-name support and enforce one device per customer where safe."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    tables = set(inspector.get_table_names())
+    if "customer_accounts" in tables:
+        columns = {column["name"] for column in inspector.get_columns("customer_accounts")}
+        if "display_name" not in columns:
+            with db.engine.begin() as connection:
+                connection.execute(text(
+                    "ALTER TABLE customer_accounts ADD COLUMN display_name VARCHAR(40) NOT NULL DEFAULT 'Guest'"
+                ))
+            app.logger.info("Added display_name to existing customer accounts.")
+
+    if "customer_devices" in tables:
+        with db.engine.begin() as connection:
+            duplicates = connection.execute(text(
+                "SELECT account_id FROM customer_devices GROUP BY account_id HAVING COUNT(*) > 1 LIMIT 1"
+            )).first()
+            if duplicates:
+                app.logger.warning(
+                    "One-device-per-customer unique index was not added: legacy duplicate device ownership exists."
+                )
+            else:
+                connection.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_device_one_per_account_idx ON customer_devices (account_id)"
+                ))
+
 
 def _migrate_token_columns(app: Flask) -> None:
     """Add token pricing to existing package tables without resetting customer data."""
