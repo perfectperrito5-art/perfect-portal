@@ -11,7 +11,7 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
     _db_url = os.getenv("DATABASE_URL", "").strip()
     if not _db_url or _db_url.startswith("sqlite:///instance/"):
-        SQLALCHEMY_DATABASE_URI = f"sqlite:///{BASE_DIR / 'instance' / 'portal.db'}"
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{BASE_DIR / 'instance' / 'temp' / 'portal-test.db'}"
     else:
         SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
