@@ -24,7 +24,7 @@
   });
 
 
-  // Token account tabs and Add Tokens dialog.
+  // Token account tabs and selected-bundle payment sheet.
   const tokenTabs = document.querySelectorAll("[data-token-tab]");
   const tokenPanels = document.querySelectorAll("[data-token-panel]");
   const activateTokenTab = (name) => {
@@ -42,10 +42,31 @@
       document.querySelector("#token-panel-tokens")?.scrollIntoView({ behavior:"smooth", block:"nearest" });
     });
   });
-  const supportDialog = document.getElementById("support-dialog");
-  document.querySelectorAll("[data-open-support]").forEach((button) => button.addEventListener("click", () => supportDialog?.showModal?.()));
-  document.querySelectorAll("[data-close-support]").forEach((button) => button.addEventListener("click", () => supportDialog?.close?.()));
-  supportDialog?.addEventListener("click", (event) => { if (event.target === supportDialog) supportDialog.close(); });
+
+  const bundleSheet = document.getElementById("bundle-payment-sheet");
+  const bundleRequestForm = document.getElementById("bundle-payment-request-form");
+  const closeBundleSheet = () => bundleSheet?.close();
+  document.querySelectorAll("[data-open-bundle-sheet]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const { bundleId, bundleName, bundleTokens, bundlePrice } = button.dataset;
+      const setText = (id, value) => {
+        const node = document.getElementById(id);
+        if (node) node.textContent = value || "—";
+      };
+      setText("sheet-bundle-name", bundleName);
+      setText("sheet-step-bundle", bundleName);
+      setText("sheet-bundle-tokens", bundleTokens);
+      setText("sheet-bundle-price", (bundlePrice || "—") + " TZS");
+      setText("sheet-step-price", (bundlePrice || "—") + " TZS");
+      if (bundleRequestForm && bundleId) {
+        bundleRequestForm.action = bundleRequestForm.action.replace(/\/tokens\/bundle\/\d+\/request$/, "/tokens/bundle/" + bundleId + "/request");
+      }
+      bundleSheet?.showModal?.();
+    });
+  });
+  document.querySelectorAll("[data-close-bundle-sheet]").forEach((button) => button.addEventListener("click", closeBundleSheet));
+  bundleSheet?.addEventListener("click", (event) => { if (event.target === bundleSheet) closeBundleSheet(); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && bundleSheet?.open) closeBundleSheet(); });
   document.querySelectorAll(".reveal-value").forEach((button) => {
     button.addEventListener("click", () => {
       const value = button.parentElement?.querySelector(".private-value");
