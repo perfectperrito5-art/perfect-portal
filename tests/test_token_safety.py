@@ -173,7 +173,7 @@ class TokenSafetyTests(unittest.TestCase):
             SiteSetting.set("purchasing_mode", "tokens")
             self.app.config["GATEWAY_ENABLED"] = True
             from app.services import access as access_service
-            with patch.object(access_service, "run_gateway", return_value=True):
+            with patch.object(access_service, "run_gateway", side_effect=lambda action, *args: action == "revoke"):
                 with self.assertRaises(ValueError):
                     purchase_token_package(
                         db.session.get(CustomerAccount, self.account_id),
