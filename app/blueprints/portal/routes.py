@@ -26,9 +26,7 @@ from app.services.access import (
     run_gateway,
 )
 from app.services.payments import start_mobile_payment
-from app.services.customers import (
-    create_device_link_code, get_or_create_device_account, link_device_with_code,
-)
+from app.services.customers import get_or_create_device_account
 from app.models.customer import CustomerActivity, WalletTransaction
 from app.models.token import TokenBundle, TokenPurchase, AwardGrant, FreeTrialClaim
 from app.services.tokens import purchasing_mode, purchase_token_package, claim_daily_trial, local_today
@@ -176,52 +174,25 @@ def home():
     )
 
 
-@bp.route("/account/username", methods=["POST"])
+@bp.route("/account/name", methods=["POST"])
 @limiter.limit("5/minute")
-def update_customer_username():
+def update_customer_name():
     mac = _client_mac()
     account, _device = get_or_create_device_account(mac, _client_ip()) if mac else (None, None)
-    username = (request.form.get("username") or "").strip().upper()
-    if not account or not re.fullmatch(r"[A-Z0-9]{3,24}", username):
-        flash("Use 3–24 letters or numbers for your username.", "warning")
+    display_name = " ".join((request.form.get("display_name") or "").split())
+    if not account or not display_name or len(display_name) > 40:
+        flash("Enter a name using 1–40 characters.", "warning")
         return _portal_redirect("/")
-    from app.models.customer import CustomerAccount
-    if CustomerAccount.query.filter(CustomerAccount.username == username, CustomerAccount.id != account.id).first():
-        flash("That username is already taken.", "warning")
-        return _portal_redirect("/")
-    old = account.username
-    account.username = username
-    db.session.add(CustomerActivity(account_id=account.id, event_type="username_changed", details=f"Username changed from {old} to {username}"))
-    db.session.commit()
-    flash("Username updated.", "success")
-    return _portal_redirect("/")
-
-
-@bp.route("/account/link-code", methods=["POST"])
-@limiter.limit("3/minute")
-def customer_link_code():
-    mac = _client_mac()
-    account, _device = get_or_create_device_account(mac, _client_ip()) if mac else (None, None)
-    try:
-        code = create_device_link_code(account)
-    except ValueError as exc:
-        flash(str(exc), "warning")
-    else:
-        flash(f"Device linking code: {code} (valid for 5 minutes).", "success")
-    return _portal_redirect("/")
-
-
-@bp.route("/account/link-device", methods=["POST"])
-@limiter.limit("5/minute")
-def customer_link_device():
-    mac = _client_mac()
-    try:
-        account, device = link_device_with_code(request.form.get("code", "").strip(), mac or "", _client_ip())
-        session["client_mac"] = device.mac_address
-    except ValueError as exc:
-        flash(str(exc), "warning")
-    else:
-        flash(f"This device is now linked to {account.username}.", "success")
+    old_name = account.display_name
+    if old_name != display_name:
+        account.display_name = display_name
+        db.session.add(CustomerActivity(
+            account_id=account.id,
+            event_type="display_name_changed",
+            details="Customer display name updated",
+        ))
+        db.session.commit()
+        flash("Name updated.", "success")
     return _portal_redirect("/")
 
 
