@@ -29,7 +29,9 @@ from app.services.payments import start_mobile_payment
 from app.services.customers import (
     create_device_link_code, get_or_create_device_account, link_device_with_code,
 )
-from app.models.customer import CustomerActivity
+from app.models.customer import CustomerActivity, WalletTransaction
+from app.models.token import TokenBundle, TokenPurchase
+from app.services.tokens import purchasing_mode, purchase_token_package, claim_daily_trial
 import re
 from app.services.phone import detect_network
 from app.services.selcom import SelcomError
@@ -137,8 +139,10 @@ def _client_mac() -> str | None:
 
 @bp.route("/")
 def home():
+    mode = purchasing_mode()
     packages = (
         Package.query.filter_by(is_active=True)
+        .filter(Package.duration_minutes > 2)
         .order_by(Package.sort_order.asc(), Package.price_tzs.asc())
         .all()
     )
@@ -154,9 +158,14 @@ def home():
 
     pay_form = PayForm(mac=mac or "")
     voucher_form = VoucherForm(mac=mac or "")
+    token_bundles = TokenBundle.query.filter_by(is_active=True).order_by(TokenBundle.sort_order, TokenBundle.id).all() if mode == "tokens" else []
+    wallet_history = WalletTransaction.query.filter_by(account_id=customer_account.id).order_by(WalletTransaction.created_at.desc()).limit(30).all() if mode == "tokens" and customer_account else []
     return render_template(
         "portal/home.html",
         packages=packages,
+        purchasing_mode=mode,
+        token_bundles=token_bundles,
+        wallet_history=wallet_history,
         pay_form=pay_form,
         voucher_form=voucher_form,
         active_session=active,
@@ -212,6 +221,80 @@ def customer_link_device():
         flash(str(exc), "warning")
     else:
         flash(f"This device is now linked to {account.username}.", "success")
+    return _portal_redirect("/")
+
+
+@bp.route("/tokens/package/<int:package_id>/buy", methods=["POST"])
+@limiter.limit("5/minute")
+def token_package_buy(package_id):
+    if purchasing_mode() != "tokens":
+        flash("Token purchasing is not enabled.", "warning")
+        return _portal_redirect("/")
+    mac = _client_mac()
+    account, device = get_or_create_device_account(mac, _client_ip()) if mac else (None, None)
+    package = Package.query.get_or_404(package_id)
+    try:
+        access = purchase_token_package(account, device, package, _client_ip())
+    except ValueError as exc:
+        flash(str(exc), "warning")
+        return _portal_redirect("/")
+    return redirect(url_for("portal.connected", session_id=access.id))
+
+
+@bp.route("/tokens/trial", methods=["POST"])
+@limiter.limit("2/day")
+def token_free_trial():
+    if purchasing_mode() != "tokens":
+        flash("Free trial is unavailable in this purchasing mode.", "warning")
+        return _portal_redirect("/")
+    mac = _client_mac()
+    account, device = get_or_create_device_account(mac, _client_ip()) if mac else (None, None)
+    if not account or not device:
+        flash("Could not identify this device.", "warning")
+        return _portal_redirect("/")
+    trial_package = Package.query.filter_by(name="__ACCOUNT_DAILY_TRIAL__").first()
+    if not trial_package:
+        trial_package = Package(name="__ACCOUNT_DAILY_TRIAL__", description="Account daily trial",
+                                price_tzs=0, token_cost=0, duration_minutes=2,
+                                sort_order=-100, is_active=False)
+        db.session.add(trial_package)
+        db.session.commit()
+    try:
+        claim = claim_daily_trial(account.id, device.id)
+        access = __import__("app.services.access", fromlist=["grant_access"]).grant_access(
+            package=trial_package, mac=device.mac_address, ip=_client_ip()
+        )
+        from flask import current_app
+        if current_app.config.get("GATEWAY_ENABLED") and not access.gateway_authorized:
+            from app.services.access import revoke_session
+            revoke_session(access, reason="trial_gateway_failure")
+            db.session.delete(claim)
+            db.session.commit()
+            raise ValueError("Wi-Fi could not be activated. Please try again or contact support.")
+        db.session.add(CustomerActivity(account_id=account.id, device_id=device.id,
+                                         event_type="free_trial_started", details="Two-minute daily account trial"))
+        db.session.commit()
+    except ValueError as exc:
+        flash(str(exc), "warning")
+        return _portal_redirect("/")
+    return redirect(url_for("portal.connected", session_id=access.id))
+
+
+@bp.route("/tokens/bundle/<int:bundle_id>/request", methods=["POST"])
+@limiter.limit("5/minute")
+def token_bundle_request(bundle_id):
+    if purchasing_mode() != "tokens":
+        return _portal_redirect("/")
+    account, _device = get_or_create_device_account(_client_mac(), _client_ip())
+    bundle = TokenBundle.query.filter_by(id=bundle_id, is_active=True).first_or_404()
+    if account:
+        db.session.add(TokenPurchase(account_id=account.id, bundle_id=bundle.id,
+                                     bundle_name=bundle.name, price_tzs=bundle.price_tzs,
+                                     token_amount=bundle.token_amount, status="contact_support"))
+        db.session.add(CustomerActivity(account_id=account.id, event_type="token_bundle_requested",
+                                         details=f"Requested {bundle.name} bundle; pending support verification"))
+        db.session.commit()
+    flash("Contact support to complete payment and have tokens credited to your account.", "info")
     return _portal_redirect("/")
 
 
