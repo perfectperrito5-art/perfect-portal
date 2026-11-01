@@ -174,9 +174,10 @@ def evaluate_consecutive_purchase_awards(account, access_session):
         criteria = json.loads(rule.criteria_json or "{}")
         required_days = max(2, int(criteria.get("consecutive_days", 3)))
         required_package = criteria.get("package_id")
+        # Historical purchases remain qualifying even after the access session expires
+        # or is revoked by the next package purchase.
         query = AccessSession.query.filter(
             AccessSession.mac_address.in_(device_macs),
-            AccessSession.revoked.is_(False),
         ).order_by(AccessSession.started_at.desc()).limit(500)
         sessions = query.all()
         day_package = {}
