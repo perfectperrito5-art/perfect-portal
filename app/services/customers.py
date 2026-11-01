@@ -63,6 +63,8 @@ def get_or_create_device_account(mac_address: str, ip_address: str = ""):
                 event_type="account_created", details="Automatic account creation",
             ))
             db.session.commit()
+            from app.services.tokens import evaluate_device_awards
+            evaluate_device_awards(account)
             return account, device
         except IntegrityError:
             db.session.rollback()
