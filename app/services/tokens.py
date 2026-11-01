@@ -106,6 +106,7 @@ def purchase_token_package(account, device, package, ip_address="", idempotency_
                 return previous_session
         raise ValueError("This purchase request has already been processed. Refresh the portal before trying again.")
     debit_tokens(account.id, package.token_cost, note=f"Package: {package.name}", reference=ref)
+    access = None
     try:
         access = grant_access(package=package, mac=device.mac_address, ip=ip_address)
         from flask import current_app
@@ -120,15 +121,23 @@ def purchase_token_package(account, device, package, ip_address="", idempotency_
             details=f"{package.name} purchased for {package.token_cost} tokens",
         ))
         db.session.commit()
-        evaluate_consecutive_purchase_awards(account, access)
-        return access
     except Exception:
-        # A refund is only applied if no refund ledger entry exists. Preserve
-        # the original exception and avoid charging twice on retries.
+        # Never leave a successfully authorised session running after a
+        # compensating refund.
+        if access is not None and not access.revoked:
+            revoke_session(access, reason="token_purchase_rollback")
         if not WalletTransaction.query.filter_by(reference=f"refund:{ref}").first():
             credit_tokens(account.id, package.token_cost, transaction_type="purchase_refund",
                           note="Refund after package activation error", reference=f"refund:{ref}")
         raise
+
+    try:
+        evaluate_consecutive_purchase_awards(account, access)
+    except Exception:
+        db.session.rollback()
+        from flask import current_app
+        current_app.logger.exception("Could not evaluate purchase awards for account %s", account.id)
+    return access
 
 
 def evaluate_device_awards(account):
