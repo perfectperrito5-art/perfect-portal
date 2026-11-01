@@ -71,24 +71,54 @@
         <article class="token-package token-bundle">
           <div><strong>{{ bundle.name }}</strong><span>{{ bundle.token_amount }} tokens</span></div>
           <b>{{ '{:,}'.format(bundle.price_tzs) }} TZS</b>
-          <form method="post" action="{{ url_for('portal.token_bundle_request', bundle_id=bundle.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-primary" type="submit">Select</button></form>
+          <button class="btn btn-primary bundle-select" type="button"
+                  data-open-bundle-sheet
+                  data-bundle-id="{{ bundle.id }}"
+                  data-bundle-name="{{ bundle.name }}"
+                  data-bundle-tokens="{{ bundle.token_amount }}"
+                  data-bundle-price="{{ '{:,}'.format(bundle.price_tzs) }}">
+            Select <span aria-hidden="true">↗</span>
+          </button>
         </article>
       {% else %}<p class="empty">No token bundles are available.</p>{% endfor %}
       </div>
       <button class="support-help" type="button" data-open-support>How to add tokens</button>
     </div>
   </section>
-  <dialog class="support-dialog" id="support-dialog">
-    <div class="support-dialog-head"><strong>How to get tokens</strong><button type="button" data-close-support aria-label="Close">×</button></div>
-    <div class="support-dialog-body">
-      <p class="support-intro">Follow these simple steps to purchase your tokens.</p>
-      <ol class="support-steps">
-        <li><span>1</span><div><strong>Make a payment</strong><p>Select a bundle and send the required amount using the payment instructions provided by the hostel.</p></div></li>
-        <li><span>2</span><div><strong>Contact support</strong><p>Send your payment confirmation and account username.</p></div></li>
-        <li><span>3</span><div><strong>Receive tokens</strong><p>The support team will verify your payment and add tokens to your account.</p></div></li>
+  <dialog class="bundle-payment-sheet" id="bundle-payment-sheet" aria-labelledby="bundle-sheet-title">
+    <div class="bundle-sheet-grabber" aria-hidden="true"></div>
+    <div class="bundle-sheet-head">
+      <div>
+        <span class="bundle-sheet-eyebrow">TOKEN TOP-UP</span>
+        <h2 id="bundle-sheet-title">Complete your payment</h2>
+      </div>
+      <button type="button" data-close-bundle-sheet aria-label="Close payment instructions">×</button>
+    </div>
+    <div class="bundle-sheet-content">
+      <div class="bundle-selected-summary">
+        <div><span>Selected bundle</span><strong id="sheet-bundle-name">—</strong></div>
+        <div class="bundle-summary-values"><strong id="sheet-bundle-tokens">—</strong><span>Tokens</span><b id="sheet-bundle-price">—</b></div>
+      </div>
+      <p class="bundle-sheet-intro">Fuata hatua hizi ili kuongeza Tokens kwenye akaunti yako.</p>
+      <ol class="bundle-payment-steps">
+        <li><span class="bundle-step-number">1</span><div><strong>Thibitisha bundle uliyochagua</strong><p>Umechagua <b id="sheet-step-bundle">—</b> kwa <b id="sheet-step-price">—</b>.</p></div></li>
+        <li><span class="bundle-step-number">2</span><div><strong>Fanya malipo</strong><p>Lipia kwenye namba <b class="payment-business-number">{{ theme.business_pay_number or 'Namba ya malipo haijawekwa' }}</b>{% if theme.business_pay_name %}; jina litakaloonekana ni <b>{{ theme.business_pay_name }}</b>{% endif %}.</p></div></li>
+        <li><span class="bundle-step-number">3</span><div><strong>Wasiliana na Support</strong><p>Tuma SMS, WhatsApp au piga simu kwa Support{% if theme.support_phone %} kupitia <b>{{ theme.support_phone }}</b>{% else %}; namba ya support haijawekwa bado{% endif %}. Toa uthibitisho wa malipo.</p>
+          {% if theme.support_phone %}
+          <div class="bundle-support-actions">
+            <a href="tel:{{ theme.support_phone }}">Call</a>
+            <a href="sms:{{ theme.support_phone }}">SMS</a>
+            <a href="https://wa.me/{{ theme.support_phone|replace('+','')|replace(' ','')|replace('-','') }}">WhatsApp</a>
+          </div>
+          {% endif %}
+        </div></li>
+        <li><span class="bundle-step-number">4</span><div><strong>Pokea Tokens zako</strong><p>Baada ya malipo kuthibitishwa, utaongezewa Tokens. Kisha unaweza kujiunga na SAIGONI WiFi muda wowote kupitia Tokens zako.</p></div></li>
       </ol>
-      {% if theme.support_phone %}<a class="btn btn-primary" href="tel:{{ theme.support_phone }}">Contact support</a>{% else %}<p class="hint">Support contact is not configured yet.</p>{% endif %}
-      <button class="support-done" type="button" data-close-support>Got it</button>
+      <form method="post" id="bundle-payment-request-form" action="{{ url_for('portal.token_bundle_request', bundle_id=0) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="bundle-confirm-button" type="submit">Nimefanya malipo — Tuma ombi <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="bundle-sheet-note">Tokens haziongezwi moja kwa moja. Support itathibitisha malipo kwanza.</p>
     </div>
   </dialog>
   {% else %}
