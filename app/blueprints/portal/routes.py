@@ -30,7 +30,7 @@ from app.services.customers import (
     create_device_link_code, get_or_create_device_account, link_device_with_code,
 )
 from app.models.customer import CustomerActivity, WalletTransaction
-from app.models.token import TokenBundle, TokenPurchase
+from app.models.token import TokenBundle, TokenPurchase, AwardGrant
 from app.services.tokens import purchasing_mode, purchase_token_package, claim_daily_trial
 import re
 from app.services.phone import detect_network
@@ -158,12 +158,14 @@ def home():
     voucher_form = VoucherForm(mac=mac or "")
     token_bundles = TokenBundle.query.filter_by(is_active=True).order_by(TokenBundle.sort_order, TokenBundle.id).all() if mode == "tokens" else []
     wallet_history = WalletTransaction.query.filter_by(account_id=customer_account.id).order_by(WalletTransaction.created_at.desc()).limit(30).all() if mode == "tokens" and customer_account else []
+    award_history = AwardGrant.query.filter_by(account_id=customer_account.id).order_by(AwardGrant.created_at.desc()).limit(20).all() if mode == "tokens" and customer_account else []
     return render_template(
         "portal/home.html",
         packages=packages,
         purchasing_mode=mode,
         token_bundles=token_bundles,
         wallet_history=wallet_history,
+        award_history=award_history,
         pay_form=pay_form,
         voucher_form=voucher_form,
         active_session=active,
