@@ -301,6 +301,9 @@ def token_bundle_request(bundle_id):
 @bp.route("/pay", methods=["POST"])
 @limiter.limit("8/minute")
 def pay():
+    if purchasing_mode() == "tokens":
+        flash("Direct payment is disabled while token mode is active.", "warning")
+        return _portal_redirect("/")
     form = PayForm()
     if not form.validate_on_submit():
         flash("Check your phone number and try again.", "warning")
@@ -377,6 +380,9 @@ def connected(session_id: int | None = None):
 @bp.route("/redeem", methods=["POST"])
 @limiter.limit("10/minute")
 def redeem():
+    if purchasing_mode() == "tokens":
+        flash("Voucher redemption is disabled while token mode is active.", "warning")
+        return _portal_redirect("/")
     form = VoucherForm()
     if not form.validate_on_submit():
         flash("Enter a valid voucher code.", "warning")
