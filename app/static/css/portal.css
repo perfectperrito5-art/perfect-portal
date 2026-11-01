@@ -651,3 +651,5 @@ body {
 .support-dialog-head button { border:0;background:transparent;color:inherit;font-size:1.7rem;cursor:pointer; }
 .support-dialog-body { padding:1.25rem; }.support-dialog-body p { margin:0 0 1rem; color:var(--brand-muted); }
 @media(max-width:420px){.token-package{grid-template-columns:minmax(0,1fr) auto;}.token-package form{grid-column:1/-1}.token-package .btn{width:100%;}}
+
+.token-brand-hidden { display:none; }
