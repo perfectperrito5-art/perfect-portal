@@ -21,7 +21,7 @@
     <div class="customer-identity" aria-label="Device details">
       <form method="post" action="{{ url_for('portal.update_customer_name') }}" class="identity-name-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label for="customer-display-name">Name</label>
+        <label for="customer-display-name">Name (Editable)</label>
         <div><input id="customer-display-name" name="display_name" value="{{ customer_account.display_name }}" maxlength="40" required><button type="submit" aria-label="Save name">Save</button></div>
       </form>
       <div class="identity-meta">
@@ -39,7 +39,6 @@
       <button class="token-tab" id="token-tab-tokens" type="button" role="tab" aria-selected="false" aria-controls="token-panel-tokens" data-token-tab="tokens">Tokens</button>
     </div>
     <div class="token-tab-panel" id="token-panel-packages" role="tabpanel" aria-labelledby="token-tab-packages" data-token-panel="packages">
-      <h2>Internet Packages</h2>
       {% if customer_account and not active_session %}
       <form method="post" action="{{ url_for('portal.token_free_trial') }}" class="trial-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-ghost" type="submit" {% if trial_used_today %}disabled{% endif %}>{% if trial_used_today %}Free trial used today{% else %}Try free for 2 minutes{% endif %}</button></form>
       {% endif %}
@@ -54,7 +53,6 @@
       </div>
     </div>
     <div class="token-tab-panel" id="token-panel-history" role="tabpanel" aria-labelledby="token-tab-history" data-token-panel="history" hidden>
-      <h2>History</h2>
       <div class="wallet-history">
       {% for item in wallet_history %}
         <div class="wallet-history-row"><div><strong>{{ item.transaction_type|replace('_',' ')|title }}</strong><small>{{ format_local(item.created_at) }} · {{ item.note }}</small></div><b class="{% if item.amount > 0 %}credit{% else %}debit{% endif %}">{{ '%+d'|format(item.amount) }}</b></div>
@@ -65,7 +63,6 @@
       </div>
     </div>
     <div class="token-tab-panel" id="token-panel-tokens" role="tabpanel" aria-labelledby="token-tab-tokens" data-token-panel="tokens" hidden>
-      <h2>Token Bundles</h2>
       <div class="token-package-list">
       {% for bundle in token_bundles %}
         <article class="token-package token-bundle">
@@ -88,21 +85,21 @@
     <div class="bundle-sheet-grabber" aria-hidden="true"></div>
     <div class="bundle-sheet-head">
       <div>
-        <span class="bundle-sheet-eyebrow">TOKEN TOP-UP</span>
-        <h2 id="bundle-sheet-title">Complete your payment</h2>
+        <span class="bundle-sheet-eyebrow">TOKENS TOP-UP</span>
+        <h2 id="bundle-sheet-title">NUNUA TOKENS</h2>
       </div>
       <button type="button" data-close-bundle-sheet aria-label="Close payment instructions">×</button>
     </div>
     <div class="bundle-sheet-content">
       <div class="bundle-selected-summary">
-        <div><span>Selected bundle</span><strong id="sheet-bundle-name">—</strong></div>
+        <div><strong id="sheet-bundle-name">—</strong></div>
         <div class="bundle-summary-values"><strong id="sheet-bundle-tokens">—</strong><span>Tokens</span><b id="sheet-bundle-price">—</b></div>
-      </div>
-      <p class="bundle-sheet-intro">Fuata hatua hizi ili kuongeza Tokens kwenye akaunti yako.</p>
+      </div></div>
+      <p>   </p>
       <ol class="bundle-payment-steps">
-        <li><span class="bundle-step-number">1</span><div><strong>Thibitisha bundle uliyochagua</strong><p>Umechagua <b id="sheet-step-bundle">—</b> kwa <b id="sheet-step-price">—</b>.</p></div></li>
-        <li><span class="bundle-step-number">2</span><div><strong>Fanya malipo</strong><p>Lipia kwenye namba <b class="payment-business-number">{{ theme.business_pay_number or 'Namba ya malipo haijawekwa' }}</b>{% if theme.business_pay_name %}; jina litakaloonekana ni <b>{{ theme.business_pay_name }}</b>{% endif %}.</p></div></li>
-        <li><span class="bundle-step-number">3</span><div><strong>Wasiliana na Support</strong><p>Tuma SMS, WhatsApp au piga simu kwa Support{% if theme.support_phone %} kupitia <b>{{ theme.support_phone }}</b>{% else %}; namba ya support haijawekwa bado{% endif %}. Toa uthibitisho wa malipo.</p>
+        <li><span class="bundle-step-number">1</span><div><p>Umechagua <b id="sheet-step-bundle">—</b> kwa <b id="sheet-step-price">—</b>.</p></div></li>
+        <li><span class="bundle-step-number">2</span><div><p>Lipia kwenye namba <b class="payment-business-number">{{ theme.business_pay_number or 'Namba ya malipo haijawekwa' }}</b>{% if theme.business_pay_name %}; jina litakaloonekana ni <b>{{ theme.business_pay_name }}</b>{% endif %}.</p></div></li>
+        <li><span class="bundle-step-number">3</span><div><p>Tuma SMS, WhatsApp au piga simu kwa Supporter{% if theme.support_phone %} kupitia <b>{{ theme.support_phone }}</b>{% else %}; namba ya supporter haijawekwa bado{% endif %}. Toa uthibitisho wa malipo.</p>
           {% if theme.support_phone %}
           <div class="bundle-support-actions">
             <a href="tel:{{ theme.support_phone }}">Call</a>
@@ -111,13 +108,9 @@
           </div>
           {% endif %}
         </div></li>
-        <li><span class="bundle-step-number">4</span><div><strong>Pokea Tokens zako</strong><p>Baada ya malipo kuthibitishwa, utaongezewa Tokens. Kisha unaweza kujiunga na SAIGONI WiFi muda wowote kupitia Tokens zako.</p></div></li>
+        <li><span class="bundle-step-number">4</span><div><p>Baada ya malipo kuthibitishwa, utaongezewa Tokens na kuweza kujiunga na <strong>SAIGONI WiFi</strong> muda wowote kupitia Tokens zako.</p></div></li>
       </ol>
-      <form method="post" id="bundle-payment-request-form" action="{{ url_for('portal.token_bundle_request', bundle_id=0) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="bundle-confirm-button" type="submit">Nimefanya malipo — Tuma ombi <span aria-hidden="true">→</span></button>
-      </form>
-      <p class="bundle-sheet-note">Tokens haziongezwi moja kwa moja. Support itathibitisha malipo kwanza.</p>
+      <p>   </p>
     </div>
   </dialog>
   {% else %}
