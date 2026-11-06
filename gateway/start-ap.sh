@@ -100,8 +100,10 @@ if ! python3 - "$PORTAL_IP" "$PORTAL_NET" "$DHCP_START" "$DHCP_END" <<'PY'
 import ipaddress
 import sys
 
-portal_ip, network, start, end = map(ipaddress.ip_address, sys.argv[1:])
+portal_ip = ipaddress.ip_address(sys.argv[1])
 net = ipaddress.ip_network(sys.argv[2], strict=False)
+start = ipaddress.ip_address(sys.argv[3])
+end = ipaddress.ip_address(sys.argv[4])
 if portal_ip not in net or start not in net or end not in net:
     raise SystemExit("PORTAL_IP and DHCP range must all belong to PORTAL_NET")
 if int(start) > int(end):
