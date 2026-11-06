@@ -82,6 +82,43 @@ if [[ ! -d "/sys/class/net/$WAN_IF" ]]; then
   exit 1
 fi
 
+# Validate all address/interface assumptions BEFORE stopping a running AP or
+# changing interface state. The DHCP config below is explicitly /24.
+if [[ "$LAN_IF" == "$WAN_IF" ]]; then
+  echo "LAN_IF and WAN_IF must be different interfaces (both are $LAN_IF)." >&2
+  exit 1
+fi
+if [[ "$PORTAL_NET" != */24 ]]; then
+  echo "PORTAL_NET must be a /24 network because DHCP currently uses a /24 mask." >&2
+  exit 1
+fi
+if [[ -n "${WIFI_PASS}" && ${#WIFI_PASS} -lt 8 ]]; then
+  echo "WIFI_PASS must be at least 8 characters (or leave empty for open AP)." >&2
+  exit 1
+fi
+if ! python3 - "$PORTAL_IP" "$PORTAL_NET" "$DHCP_START" "$DHCP_END" <<'PY'
+import ipaddress
+import sys
+
+portal_ip = ipaddress.ip_address(sys.argv[1])
+net = ipaddress.ip_network(sys.argv[2], strict=False)
+start = ipaddress.ip_address(sys.argv[3])
+end = ipaddress.ip_address(sys.argv[4])
+if portal_ip not in net or start not in net or end not in net:
+    raise SystemExit("PORTAL_IP and DHCP range must all belong to PORTAL_NET")
+if int(start) > int(end):
+    raise SystemExit("DHCP_START must be less than or equal to DHCP_END")
+if portal_ip in (start, end) or int(start) <= int(portal_ip) <= int(end):
+    raise SystemExit("PORTAL_IP must be outside the DHCP pool")
+if start == net.network_address or end == net.broadcast_address:
+    raise SystemExit("DHCP pool cannot include network/broadcast addresses")
+PY
+then
+  echo "Invalid LAN/DHCP address configuration; AP was not stopped." >&2
+  exit 1
+fi
+
+log "Preflight OK: AP_ROLE=$AP_ROLE LAN=$LAN_IF WAN=$WAN_IF NET=$PORTAL_NET PORTAL=$PORTAL_IP DHCP=$DHCP_START-$DHCP_END"
 log "Stopping any previous Perfect Portal AP..."
 "$SCRIPT_DIR/stop-ap.sh" --quiet || true
 
@@ -159,10 +196,16 @@ address=/www.msftconnecttest.com/${PORTAL_IP}
 address=/dns.msftncsi.com/${PORTAL_IP}
 address=/detectportal.firefox.com/${PORTAL_IP}
 address=/network-test.debian.org/${PORTAL_IP}
+address=/ipv6.msftconnecttest.com/${PORTAL_IP}
 dhcp-leasefile=$RUNTIME_DIR/dnsmasq.leases
 log-facility=$RUNTIME_DIR/dnsmasq.log
 EOF
 
+# Validate generated service configs before attempting to launch them.
+if ! dnsmasq --test --conf-file="$DNSMASQ_CFG" >> "$RUNTIME_DIR/dnsmasq.log" 2>&1; then
+  log "ERROR: dnsmasq config validation failed. Review $RUNTIME_DIR/dnsmasq.log"
+  exit 1
+fi
 # IP forwarding + NAT out via Ethernet
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 
@@ -249,6 +292,26 @@ fi
 # Start dnsmasq
 dnsmasq --conf-file="$DNSMASQ_CFG" --pid-file="$PID_DIR/dnsmasq.pid"
 sleep 0.5
+if [[ -f "$PID_DIR/dnsmasq.pid" ]] && kill -0 "$(cat "$PID_DIR/dnsmasq.pid")" 2>/dev/null; then
+  log "dnsmasq started successfully (DHCP/DNS on $LAN_IF)"
+else
+  log "ERROR: dnsmasq process did not remain running. Review $RUNTIME_DIR/dnsmasq.log"
+  exit 1
+fi
+
+# Record useful state for diagnosing wrong-subnet/DHCP and captive-portal issues.
+{
+  echo "===== $(date -Is) AP startup diagnostics ====="
+  echo "AP_ROLE=$AP_ROLE SSID=$SSID LAN_IF=$LAN_IF WAN_IF=$WAN_IF"
+  echo "PORTAL_NET=$PORTAL_NET PORTAL_IP=$PORTAL_IP DHCP=$DHCP_START-$DHCP_END"
+  ip -br addr
+  echo "--- routes ---"
+  ip route
+  echo "--- listeners ---"
+  ss -ulpn 2>/dev/null | grep -E ':(53|67)\\b' || true
+  echo "--- DHCP leases ---"
+  cat "$RUNTIME_DIR/dnsmasq.leases" 2>/dev/null || true
+} >> "$LOG" 2>&1
 
 # Portal process
 if [[ "${START_PORTAL}" == "yes" ]]; then

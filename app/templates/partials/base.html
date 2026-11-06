@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="{{ theme.primary_color }}">
   <title>{% block title %}{{ theme.brand_name }}{% endblock %}</title>
-  {# Absolute portal URL — survives DNS switch after Wi‑Fi unlock #}
-  {% set asset_root = portal_base if portal_base else '' %}
-  <link rel="stylesheet" href="{{ asset_root }}{{ url_for('static', filename='css/portal.css') }}">
+  {# Static assets must stay same-origin: 127.0.0.1 on a customer's phone is their own device. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/portal.css', v='token-ui-4') }}">
   <style>
     :root {
       --brand-primary: {{ theme.primary_color }};
@@ -16,7 +15,7 @@
       --brand-muted: {{ theme.muted_color }};
       --brand-surface: {{ theme.surface_color }};
       {% if theme.background_type == 'image' and theme.background_image %}
-      --brand-bg: url('{{ asset_root }}{{ url_for('static', filename=theme.background_image) }}') center/cover no-repeat fixed;
+      --brand-bg: url('{{ url_for('static', filename=theme.background_image) }}') center/cover no-repeat fixed;
       {% elif theme.background_type == 'solid' %}
       --brand-bg: {{ theme.background_value }};
       {% else %}
@@ -38,7 +37,7 @@
     {% endif %}
   {% endwith %}
   {% block body %}{% endblock %}
-  <script src="{{ asset_root }}{{ url_for('static', filename='js/portal.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/portal.js', v='token-ui-4') }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -23,6 +23,61 @@
     });
   });
 
+
+  // Token account tabs and selected-bundle payment sheet.
+  const tokenTabs = document.querySelectorAll("[data-token-tab]");
+  const tokenPanels = document.querySelectorAll("[data-token-panel]");
+  const activateTokenTab = (name) => {
+    tokenTabs.forEach((tab) => {
+      const active = tab.dataset.tokenTab === name;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    tokenPanels.forEach((panel) => { panel.hidden = panel.dataset.tokenPanel !== name; });
+  };
+  tokenTabs.forEach((tab) => tab.addEventListener("click", () => activateTokenTab(tab.dataset.tokenTab)));
+  document.querySelectorAll("[data-token-tab-trigger]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activateTokenTab(button.dataset.tokenTabTrigger);
+      document.querySelector("#token-panel-tokens")?.scrollIntoView({ behavior:"smooth", block:"nearest" });
+    });
+  });
+
+  const bundleSheet = document.getElementById("bundle-payment-sheet");
+  const bundleRequestForm = document.getElementById("bundle-payment-request-form");
+  const closeBundleSheet = () => bundleSheet?.close();
+  document.querySelectorAll("[data-open-bundle-sheet]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const { bundleId, bundleName, bundleTokens, bundlePrice } = button.dataset;
+      const setText = (id, value) => {
+        const node = document.getElementById(id);
+        if (node) node.textContent = value || "—";
+      };
+      setText("sheet-bundle-name", bundleName);
+      setText("sheet-step-bundle", bundleName);
+      setText("sheet-bundle-tokens", bundleTokens);
+      setText("sheet-bundle-price", (bundlePrice || "—") + " TZS");
+      setText("sheet-step-price", (bundlePrice || "—") + " TZS");
+      if (bundleRequestForm && bundleId) {
+        bundleRequestForm.action = bundleRequestForm.action.replace(/\/tokens\/bundle\/\d+\/request$/, "/tokens/bundle/" + bundleId + "/request");
+      }
+      bundleSheet?.showModal?.();
+    });
+  });
+  document.querySelectorAll("[data-close-bundle-sheet]").forEach((button) => button.addEventListener("click", closeBundleSheet));
+  bundleSheet?.addEventListener("click", (event) => { if (event.target === bundleSheet) closeBundleSheet(); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && bundleSheet?.open) closeBundleSheet(); });
+  document.querySelectorAll(".reveal-value").forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = button.parentElement?.querySelector(".private-value");
+      if (!value) return;
+      const visible = button.dataset.shown === "1";
+      value.textContent = visible ? "••••••••" : value.dataset.privateValue;
+      button.dataset.shown = visible ? "0" : "1";
+      button.textContent = visible ? "Show" : "Hide";
+    });
+  });
+
   const phoneInput = document.querySelector("#pay-form input[name='phone']");
   const networkHint = document.getElementById("network-hint");
   let detectTimer = null;

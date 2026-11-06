@@ -1,0 +1,75 @@
+name: Portal checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/account-token-system]
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile application
+        run: python -m compileall -q app run.py
+      - name: Smoke-test database bootstrap and portal rendering
+        env:
+          DATABASE_URL: sqlite:////tmp/perfect-portal-ci.db
+          SECRET_KEY: ci-test-secret
+          ADMIN_USERNAME: ci-admin
+          ADMIN_PASSWORD: ci-test-password
+          GATEWAY_ENABLED: "false"
+          WTF_CSRF_ENABLED: "false"
+        run: |
+          python - <<'PY'
+          from app import create_app
+          from app.extensions import db
+          from app.models.settings import SiteSetting
+          from app.models.customer import CustomerAccount
+          from app.models.package import Package
+          from app.services.tokens import claim_daily_trial
+          app = create_app()
+          app.testing = True
+          from app.blueprints.portal import routes as portal_routes
+          portal_routes.lookup_mac_for_ip = lambda ip: "AA:BB:CC:DD:EE:FF"
+          client = app.test_client()
+          legacy = client.get("/")
+          assert legacy.status_code == 200, legacy.status_code
+          with app.app_context():
+              SiteSetting.set("purchasing_mode", "tokens")
+          token_page = client.get("/?mac=AA:BB:CC:DD:EE:FF")
+          assert token_page.status_code == 200, token_page.status_code
+          assert b"Available Tokens" in token_page.data
+          assert b"Token Bundles" in token_page.data
+          with app.app_context():
+              account = CustomerAccount.query.one()
+              account.token_balance = 100
+              package = Package(name="CI token package", description="Smoke test",
+                                price_tzs=500, token_cost=10, duration_minutes=60,
+                                sort_order=1, is_active=True)
+              db.session.add(package)
+              db.session.commit()
+              package_id = package.id
+              account_id = account.id
+              claim_daily_trial(account_id)
+              try:
+                  claim_daily_trial(account_id)
+                  raise AssertionError("Daily trial should be unique per account and date.")
+              except ValueError:
+                  pass
+          bought = client.post(f"/tokens/package/{package_id}/buy?mac=AA:BB:CC:DD:EE:FF",
+                               data={"purchase_nonce": "ci-idempotency-nonce"})
+          assert bought.status_code == 302, bought.status_code
+          with app.app_context():
+              account = db.session.get(CustomerAccount, account_id)
+              assert account.token_balance == 90, account.token_balance
+          print("Legacy/token rendering, wallet debit, and daily trial uniqueness passed.")
+          PY
+      - name: Run focused token safety unit tests
+        run: python -m unittest discover -s tests -v
