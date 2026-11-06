@@ -204,11 +204,6 @@ if ! dnsmasq --test --conf-file="$DNSMASQ_CFG" >> "$RUNTIME_DIR/dnsmasq.log" 2>&
   log "ERROR: dnsmasq config validation failed. Review $RUNTIME_DIR/dnsmasq.log"
   exit 1
 fi
-if [[ "$AP_ROLE" != "device" ]] && ! hostapd -t "$HOSTAPD_CFG" >> "$RUNTIME_DIR/hostapd.log" 2>&1; then
-  log "ERROR: hostapd config validation failed. Review $RUNTIME_DIR/hostapd.log"
-  exit 1
-fi
-
 # IP forwarding + NAT out via Ethernet
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 
