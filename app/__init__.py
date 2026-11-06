@@ -87,6 +87,8 @@ def _register_blueprints(app: Flask) -> None:
     @app.route("/ncsi.txt")
     @app.route("/connecttest.txt")
     @app.route("/success.txt")
+    @app.route("/portal-check")
+    @app.route("/redirect")
     def captive_probes():
         from flask import redirect, request, url_for
 
@@ -94,14 +96,12 @@ def _register_blueprints(app: Flask) -> None:
             ensure_gateway_access,
             find_active_session,
             lookup_mac_for_ip,
-            normalize_mac,
         )
 
-        ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(
-            ","
-        )[0].strip()
-        # Captive probe query parameters are client-controlled. Resolve identity
-        # only from the network lease/ARP mapping.
+        # This endpoint is reached directly by captive clients. Do not trust
+        # X-Forwarded-For here: a client can spoof it and impersonate another
+        # device when no trusted reverse proxy is in front.
+        ip = (request.remote_addr or "").strip()
         mac = lookup_mac_for_ip(ip)
         active = find_active_session(mac)
         if active:
@@ -115,7 +115,11 @@ def _register_blueprints(app: Flask) -> None:
                 return "Microsoft NCSI", 200, {"Content-Type": "text/plain"}
             return "", 204
 
-        return redirect(url_for("portal.home"))
+        # Use the canonical portal host instead of a captive-probe hostname.
+        # Relative redirects can leave the browser on connectivitycheck.*.
+        portal_base = (app.config.get("PORTAL_BASE_URL") or "").rstrip("/")
+        portal_url = f"{portal_base}{url_for('portal.home')}" if portal_base else url_for("portal.home")
+        return redirect(portal_url, code=302)
 
 
 def _register_context(app: Flask) -> None:
