@@ -4,6 +4,12 @@ A verified network MAC resolves to one internal device, one customer and one wal
 IP addresses are retained only as diagnostic metadata.
 """
 from datetime import datetime, timedelta, timezone
+import secrets
+
+from sqlalchemy.exc import IntegrityError
+
+from app.extensions import db
+from app.models.customer import CustomerAccount, CustomerActivity, CustomerDevice
 import hashlib
 import secrets
 

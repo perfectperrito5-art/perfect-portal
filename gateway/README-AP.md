@@ -13,7 +13,7 @@ sudo ./gateway/install-autostart.sh
 sudo systemctl start perfect-portal-ap.service
 ```
 
-After that, a reboot brings Perfect-WiFi + portal back automatically  
+After that, a reboot brings Perfect-WiFi + portal back automatically
 (waits for Ethernet DHCP, then runs `start-ap.sh`).
 
 | Command | Meaning |
@@ -52,10 +52,10 @@ That will:
 
 ## Phone demo (voucher only)
 
-1. On PC admin: http://10.10.0.1:5000/auth/login → Vouchers → generate codes  
-   (or http://127.0.0.1:5000/auth/login while portal is running)
+1. On PC admin: http://10.10.0.1:7000/auth/login → Vouchers → generate codes  
+   (or http://127.0.0.1:7000/auth/login while portal is running)
 2. On phone: connect to **Perfect-WiFi**
-3. Captive page should open (or visit http://10.10.0.1:5000)
+3. Captive page should open (or visit http://10.10.0.1:7000)
 4. Redeem voucher → internet unlocks for that phone
 
 After redeem, the phone should browse normally. Reconnecting to Perfect-WiFi

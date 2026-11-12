@@ -3,6 +3,7 @@ import threading
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
+from app import create_app
 from app import create_app, _migrate_payment_provider_columns
 from app.extensions import db
 from app.models.customer import CustomerAccount, CustomerDevice, WalletTransaction

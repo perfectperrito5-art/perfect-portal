@@ -175,6 +175,9 @@ fi
 
 # dnsmasq config — real DNS for authorized browsing; only captive-detect
 # hostnames point at the portal so phones show "Sign in to network".
+#address=/connectivitycheck.gstatic.com/${PORTAL_IP} put this and these two down, btn 191 and 193
+#address=/connectivitycheck.android.com/${PORTAL_IP}
+#address=/clients2.google.com/${PORTAL_IP}
 cat > "$DNSMASQ_CFG" <<EOF
 interface=$LAN_IF
 bind-interfaces
@@ -189,7 +192,7 @@ dhcp-option=3,${PORTAL_IP}
 dhcp-option=6,${PORTAL_IP}
 address=/connectivitycheck.gstatic.com/${PORTAL_IP}
 address=/connectivitycheck.android.com/${PORTAL_IP}
-address=/clients3.google.com/${PORTAL_IP}
+address=/clients2.google.com/${PORTAL_IP}
 address=/captive.apple.com/${PORTAL_IP}
 address=/www.apple.com/${PORTAL_IP}
 address=/www.msftconnecttest.com/${PORTAL_IP}

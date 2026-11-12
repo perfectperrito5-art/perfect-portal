@@ -221,7 +221,7 @@ cd /home/admin_perfect/perfect_portal
 sudo ./gateway/start-ap.sh
 ```
 
-**Admin:** `http://<PORTAL_IP>:5000/auth/login`
+**Admin:** `http://<PORTAL_IP>:7000/auth/login`
 
 **Stop:** `sudo ./gateway/stop-ap.sh`
 
