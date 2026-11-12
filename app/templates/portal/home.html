@@ -1,10 +1,10 @@
 {% extends "partials/base.html" %}
 {% block title %}{{ theme.brand_name }} · Connect{% endblock %}
-{% block body_class %}page-home{% endblock %}
+{% block body_class %}page-home{% if purchasing_mode == 'tokens' %} token-mode{% endif %}{% endblock %}
 
 {% block body %}
 <main class="shell">
-  <header class="brand-block">
+  <header class="brand-block {% if purchasing_mode == 'tokens' %}token-brand-hidden{% endif %}">
     {% if theme.logo_path %}
       <img class="brand-logo" src="{{ url_for('static', filename=theme.logo_path) }}" alt="{{ theme.brand_name }}">
     {% endif %}
@@ -12,6 +12,108 @@
     {% if theme.tagline %}<p class="brand-tag">{{ theme.tagline }}</p>{% endif %}
   </header>
 
+  {% if purchasing_mode == 'tokens' %}
+  <section class="token-wallet">
+    <div class="wallet-top"><span>{{ theme.brand_name }}</span></div>
+    <div class="wallet-balance">{{ customer_account.token_balance if customer_account else 0 }}</div>
+    <div class="wallet-caption">Available Tokens</div>
+    {% if customer_account and customer_device %}
+    <div class="customer-identity" aria-label="Device details">
+      <form method="post" action="{{ url_for('portal.update_customer_name') }}" class="identity-name-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="customer-display-name">Name (Editable)</label>
+        <div><input id="customer-display-name" name="display_name" value="{{ customer_account.display_name }}" maxlength="40" required><button type="submit" aria-label="Save name">Save</button></div>
+      </form>
+      <div class="identity-meta">
+        <div><span>MAC Address</span><strong>{{ customer_device.mac_address }}</strong></div>
+        <div><span>IP Address</span><strong><span class="private-value" data-private-value="{{ customer_device.last_ip_address or 'Not available' }}">••••••••</span> <button class="reveal-value" type="button" aria-label="Show IP address">Show</button></strong></div>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+  {% if active_session %}<section class="panel panel-live"><h2>You're online</h2><p>{{ active_session.package.name }} · {{ remaining_label(active_session) }}</p></section>{% endif %}
+  <section class="panel token-panel">
+    <div class="token-tabs" role="tablist" aria-label="Account sections">
+      <button class="token-tab is-active" id="token-tab-packages" type="button" role="tab" aria-selected="true" aria-controls="token-panel-packages" data-token-tab="packages">Packages</button>
+      <button class="token-tab" id="token-tab-history" type="button" role="tab" aria-selected="false" aria-controls="token-panel-history" data-token-tab="history">History</button>
+      <button class="token-tab" id="token-tab-tokens" type="button" role="tab" aria-selected="false" aria-controls="token-panel-tokens" data-token-tab="tokens">Tokens</button>
+    </div>
+    <div class="token-tab-panel" id="token-panel-packages" role="tabpanel" aria-labelledby="token-tab-packages" data-token-panel="packages">
+      {% if customer_account and not active_session %}
+      <form method="post" action="{{ url_for('portal.token_free_trial') }}" class="trial-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-ghost" type="submit" {% if trial_used_today %}disabled{% endif %}>{% if trial_used_today %}Free trial used today{% else %}Try free for 2 minutes{% endif %}</button></form>
+      {% endif %}
+      <div class="token-package-list">
+      {% for pkg in packages %}
+        <article class="token-package">
+          <div><strong>{{ pkg.name }}</strong><span>{{ pkg.duration_label() }}</span></div>
+          <b>{{ pkg.token_cost }} Tokens</b>
+          <form method="post" action="{{ url_for('portal.token_package_buy', package_id=pkg.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="purchase_nonce" value="{{ purchase_nonce }}"><button class="btn btn-primary" type="submit" {% if not customer_account or customer_account.token_balance < pkg.token_cost or active_session %}disabled{% endif %}>Buy</button></form>
+        </article>
+      {% else %}<p class="empty">No token packages are available.</p>{% endfor %}
+      </div>
+    </div>
+    <div class="token-tab-panel" id="token-panel-history" role="tabpanel" aria-labelledby="token-tab-history" data-token-panel="history" hidden>
+      <div class="wallet-history">
+      {% for item in wallet_history %}
+        <div class="wallet-history-row"><div><strong>{{ item.transaction_type|replace('_',' ')|title }}</strong><small>{{ format_local(item.created_at) }} · {{ item.note }}</small></div><b class="{% if item.amount > 0 %}credit{% else %}debit{% endif %}">{{ '%+d'|format(item.amount) }}</b></div>
+      {% else %}<p class="empty">Your token activity will appear here.</p>{% endfor %}
+      {% for award in award_history if award.reward_type == 'minutes' %}
+        <div class="wallet-history-row"><div><strong>{{ award.reason_snapshot }}</strong><small>{{ format_local(award.created_at) }} · Award</small></div><b class="credit">+{{ award.reward_amount }} min</b></div>
+      {% endfor %}
+      </div>
+    </div>
+    <div class="token-tab-panel" id="token-panel-tokens" role="tabpanel" aria-labelledby="token-tab-tokens" data-token-panel="tokens" hidden>
+      <div class="token-package-list">
+      {% for bundle in token_bundles %}
+        <article class="token-package token-bundle">
+          <div><strong>{{ bundle.name }}</strong><span>{{ bundle.token_amount }} tokens</span></div>
+          <b>{{ '{:,}'.format(bundle.price_tzs) }} TZS</b>
+          <button class="btn btn-primary bundle-select" type="button"
+                  data-open-bundle-sheet
+                  data-bundle-id="{{ bundle.id }}"
+                  data-bundle-name="{{ bundle.name }}"
+                  data-bundle-tokens="{{ bundle.token_amount }}"
+                  data-bundle-price="{{ '{:,}'.format(bundle.price_tzs) }}">
+            Select <span aria-hidden="true">↗</span>
+          </button>
+        </article>
+      {% else %}<p class="empty">No token bundles are available.</p>{% endfor %}
+      </div>
+    </div>
+  </section>
+  <dialog class="bundle-payment-sheet" id="bundle-payment-sheet" aria-labelledby="bundle-sheet-title">
+    <div class="bundle-sheet-grabber" aria-hidden="true"></div>
+    <div class="bundle-sheet-head">
+      <div>
+        <span class="bundle-sheet-eyebrow">TOKENS TOP-UP</span>
+        <h2 id="bundle-sheet-title">NUNUA TOKENS</h2>
+      </div>
+      <button type="button" data-close-bundle-sheet aria-label="Close payment instructions">×</button>
+    </div>
+    <div class="bundle-sheet-content">
+      <div class="bundle-selected-summary">
+        <div><strong id="sheet-bundle-name">—</strong></div>
+        <div class="bundle-summary-values"><strong id="sheet-bundle-tokens">—</strong><span>Tokens</span><b id="sheet-bundle-price">—</b></div>
+      </div></div>
+      <p>   </p>
+      <ol class="bundle-payment-steps">
+        <li><span class="bundle-step-number">1</span><div><p>Umechagua <b id="sheet-step-bundle">—</b> kwa <b id="sheet-step-price">—</b>.</p></div></li>
+        <li><span class="bundle-step-number">2</span><div><p>Lipia kwenye namba <b class="payment-business-number">{{ theme.business_pay_number or 'Namba ya malipo haijawekwa' }}</b>{% if theme.business_pay_name %}; jina litakaloonekana ni <b>{{ theme.business_pay_name }}</b>{% endif %}.</p></div></li>
+        <li><span class="bundle-step-number">3</span><div><p>Tuma SMS, WhatsApp au piga simu kwa Supporter{% if theme.support_phone %} kupitia <b>{{ theme.support_phone }}</b>{% else %}; namba ya supporter haijawekwa bado{% endif %}. Toa uthibitisho wa malipo.</p>
+          {% if theme.support_phone %}
+          <div class="bundle-support-actions">
+            <a href="tel:{{ theme.support_phone }}">Call</a>
+            <a href="sms:{{ theme.support_phone }}">SMS</a>
+            <a href="https://wa.me/{{ theme.support_phone|replace('+','')|replace(' ','')|replace('-','') }}">WhatsApp</a>
+          </div>
+          {% endif %}
+        </div></li>
+        <li><span class="bundle-step-number">4</span><div><p>Baada ya malipo kuthibitishwa, utaongezewa Tokens na kuweza kujiunga na <strong>SAIGONI WiFi</strong> muda wowote kupitia Tokens zako.</p></div></li>
+      </ol>
+      <p>   </p>
+    </div>
+  </dialog>
+  {% else %}
   <section class="hero">
     <h1>{{ theme.hero_title }}</h1>
     <p>{{ theme.hero_subtitle }}</p>
@@ -157,6 +259,8 @@
     </div>
     {% endif %}
   </section>
+  {% endif %}
+
   {% endif %}
 
   <footer class="site-foot">

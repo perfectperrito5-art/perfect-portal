@@ -22,13 +22,6 @@ class Config:
     ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "ChangeThisStrongPassword!")
 
-    SELCOM_BASE_URL = os.getenv(
-        "SELCOM_BASE_URL", "https://apigw.selcommobile.com"
-    ).rstrip("/")
-    SELCOM_API_KEY = os.getenv("SELCOM_API_KEY", "")
-    SELCOM_API_SECRET = os.getenv("SELCOM_API_SECRET", "")
-    SELCOM_VENDOR = os.getenv("SELCOM_VENDOR", "")
-    SELCOM_WEBHOOK_SECRET = os.getenv("SELCOM_WEBHOOK_SECRET", "")
 
     # AzamPay
     AZAMPAY_BASE_URL = os.getenv(

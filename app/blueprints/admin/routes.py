@@ -33,6 +33,10 @@ from app.models.package import Package
 from app.models.payment import Payment
 from app.models.session import AccessSession
 from app.models.voucher import Voucher
+from app.models.customer import CustomerAccount, CustomerDevice, CustomerActivity, WalletTransaction
+from app.models.settings import SiteSetting
+from app.models.token import TokenBundle, TokenPurchase, AwardRule
+from app.services.tokens import credit_tokens
 from app.services.access import revoke_expired_sessions, revoke_session
 from app.services.clock import duration_to_minutes, minutes_to_amount_unit
 from app.services.payments import fulfill_payment
@@ -46,6 +50,7 @@ class PackageForm(FlaskForm):
     price_tzs = IntegerField(
         "Price (TZS)", validators=[DataRequired(), NumberRange(min=100, max=5_000_000)]
     )
+    token_cost = IntegerField("Token cost", default=0, validators=[Optional(), NumberRange(min=0, max=10_000_000)])
     duration_minutes = IntegerField(
         "Duration (minutes)",
         validators=[Optional(), NumberRange(min=1, max=525_600)],
@@ -125,7 +130,7 @@ class ThemeForm(FlaskForm):
     hero_subtitle = TextAreaField("Hero subtitle", validators=[Optional(), Length(max=400)])
     show_voucher_tab = BooleanField("Show voucher redeem on portal", default=True)
     show_online_pay = BooleanField(
-        "Show online Selcom pay (keep off until merchant access is ready)",
+        "Show online AzamPay (keep off until merchant access is ready)",
         default=False,
     )
     footer_text = StringField("Footer text", validators=[Optional(), Length(max=255)])
@@ -189,6 +194,171 @@ def dashboard():
     )
 
 
+@bp.route("/customers")
+@login_required
+def customers():
+    page = max(1, request.args.get("page", 1, type=int))
+    accounts = CustomerAccount.query.order_by(CustomerAccount.created_at.desc()).paginate(
+        page=page, per_page=30, error_out=False
+    )
+    return render_template("admin/customers.html", accounts=accounts)
+
+
+@bp.route("/customers/<int:account_id>")
+@login_required
+def customer_detail(account_id: int):
+    account = CustomerAccount.query.get_or_404(account_id)
+    devices = CustomerDevice.query.filter_by(account_id=account.id).order_by(
+        CustomerDevice.last_seen_at.desc()
+    ).all()
+    activities = CustomerActivity.query.filter_by(account_id=account.id).order_by(
+        CustomerActivity.created_at.desc()
+    ).limit(50).all()
+    device_macs = [device.mac_address for device in devices]
+    customer_sessions = AccessSession.query.filter(AccessSession.mac_address.in_(device_macs)).order_by(
+        AccessSession.started_at.desc()
+    ).limit(50).all() if device_macs else []
+    transactions = WalletTransaction.query.filter_by(account_id=account.id).order_by(
+        WalletTransaction.created_at.desc()
+    ).limit(50).all()
+    return render_template(
+        "admin/customer_detail.html", account=account, devices=devices,
+        activities=activities, transactions=transactions, customer_sessions=customer_sessions,
+    )
+
+
+@bp.route("/tokens", methods=["GET", "POST"])
+@login_required
+def tokens():
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        if action == "mode":
+            mode = request.form.get("purchasing_mode")
+            if mode not in {"tokens", "voucher_payment"}:
+                flash("Invalid purchasing mode.", "danger")
+            else:
+                SiteSetting.set("purchasing_mode", mode)
+                flash("Purchasing mode updated.", "success")
+        elif action == "bundle":
+            name = (request.form.get("name") or "").strip()
+            price = request.form.get("price_tzs", type=int)
+            quantity = request.form.get("token_amount", type=int)
+            if not name or not price or not quantity or price < 1 or quantity < 1:
+                flash("Enter a name, valid TSh price and token quantity.", "warning")
+            else:
+                db.session.add(TokenBundle(name=name[:80], price_tzs=price, token_amount=quantity))
+                db.session.commit()
+                flash("Token bundle created.", "success")
+        elif action == "credit_request":
+            purchase = TokenPurchase.query.get_or_404(request.form.get("purchase_id", type=int))
+            if purchase.status == "credited":
+                flash("This request has already been credited.", "info")
+            else:
+                credit_tokens(purchase.account_id, purchase.token_amount,
+                              transaction_type="token_bundle_purchase",
+                              note=f"{purchase.bundle_name} · {purchase.price_tzs} TZS · {request.form.get('payment_reference','')}",
+                              actor_admin_id=current_user.id,
+                              reference=f"bundle-purchase:{purchase.id}")
+                purchase.status = "credited"
+                purchase.payment_reference = (request.form.get("payment_reference") or "")[:100]
+                purchase.credited_at = datetime.now(timezone.utc)
+                db.session.add(CustomerActivity(account_id=purchase.account_id,
+                    event_type="tokens_credited", details=f"{purchase.token_amount} tokens credited for {purchase.bundle_name}"))
+                db.session.commit()
+                flash("Bundle verified and tokens credited.", "success")
+        elif action == "bundle_edit":
+            bundle = TokenBundle.query.get_or_404(request.form.get("bundle_id", type=int))
+            name = (request.form.get("name") or "").strip()
+            price = request.form.get("price_tzs", type=int)
+            quantity = request.form.get("token_amount", type=int)
+            if not name or not price or not quantity or price < 1 or quantity < 1:
+                flash("Enter a valid bundle name, price and token amount.", "warning")
+            else:
+                bundle.name = name[:80]
+                bundle.price_tzs = price
+                bundle.token_amount = quantity
+                db.session.commit()
+                flash("Token bundle updated.", "success")
+        elif action == "bundle_toggle":
+            bundle = TokenBundle.query.get_or_404(request.form.get("bundle_id", type=int))
+            bundle.is_active = not bundle.is_active
+            db.session.commit()
+            flash("Token bundle updated.", "success")
+        elif action == "credit":
+            account = CustomerAccount.query.get_or_404(request.form.get("account_id", type=int))
+            amount = request.form.get("amount", type=int)
+            note = (request.form.get("note") or "").strip()
+            try:
+                if not amount or amount < 1:
+                    raise ValueError("Enter a positive token amount.")
+                credit_tokens(account.id, amount, transaction_type="manual_credit",
+                              note=note or "Admin token credit", actor_admin_id=current_user.id)
+                db.session.add(CustomerActivity(account_id=account.id, event_type="tokens_credited",
+                                                 details=f"{amount} tokens credited by admin"))
+                db.session.commit()
+                flash("Tokens credited.", "success")
+            except ValueError as exc:
+                flash(str(exc), "warning")
+        return redirect(url_for("admin.tokens"))
+    bundles = TokenBundle.query.order_by(TokenBundle.sort_order, TokenBundle.id).all()
+    requests_pending = TokenPurchase.query.filter(TokenPurchase.status != "credited").order_by(TokenPurchase.created_at.asc()).limit(100).all()
+    return render_template("admin/tokens.html", bundles=bundles, requests_pending=requests_pending,
+                           purchasing_mode=SiteSetting.get("purchasing_mode", "voucher_payment"))
+
+
+@bp.route("/awards", methods=["GET", "POST"])
+@login_required
+def awards():
+    if request.method == "POST":
+        action = request.form.get("action", "create")
+        rule_id = request.form.get("rule_id", type=int)
+        rule = AwardRule.query.get(rule_id) if rule_id else None
+        if action == "delete" and rule:
+            rule.is_active = False
+            db.session.commit()
+            flash("Award rule archived; existing grants are preserved.", "success")
+        else:
+            name = (request.form.get("name") or "").strip()
+            rule_type = request.form.get("rule_type")
+            reward_type = request.form.get("reward_type")
+            amount = request.form.get("reward_amount", type=int)
+            package_id = request.form.get("package_id", type=int)
+            invalid_award = (
+                not name
+                or rule_type != "consecutive_package_days"
+                or reward_type not in {"tokens", "minutes"}
+                or not amount or amount < 1
+                or (rule_type == "consecutive_package_days" and not package_id)
+            )
+            if invalid_award:
+                flash("Consecutive-purchase awards need a specific package and valid reward.", "warning")
+            else:
+                import json
+                criteria = {
+                    "consecutive_days": max(2, request.form.get("consecutive_days", type=int) or 3),
+                    "package_id": package_id,
+                }
+                if rule is None:
+                    rule = AwardRule(name=name, rule_type=rule_type, reward_type=reward_type,
+                                     reward_amount=amount, criteria_json=json.dumps(criteria),
+                                     repeatable=request.form.get("repeatable") == "1")
+                    db.session.add(rule)
+                else:
+                    rule.name=name; rule.rule_type=rule_type; rule.reward_type=reward_type
+                    rule.reward_amount=amount; rule.criteria_json=json.dumps(criteria)
+                    rule.repeatable=request.form.get("repeatable") == "1"
+                    rule.is_active=True
+                db.session.commit()
+                flash("Award rule saved.", "success")
+        return redirect(url_for("admin.awards"))
+    import json
+    rules = AwardRule.query.order_by(AwardRule.created_at.desc()).all()
+    for rule in rules:
+        rule.form_criteria = json.loads(rule.criteria_json or "{}")
+    return render_template("admin/awards.html", rules=rules,
+                           packages=Package.query.filter_by(is_active=True).all())
+
+
 @bp.route("/packages")
 @login_required
 def packages():
@@ -205,6 +375,7 @@ def package_new():
             name=form.name.data.strip(),
             description=(form.description.data or "").strip(),
             price_tzs=form.price_tzs.data,
+            token_cost=form.token_cost.data or 0,
             duration_minutes=_minutes_from_package_form(form),
             sort_order=form.sort_order.data or 0,
             is_active=bool(form.is_active.data),
@@ -227,6 +398,7 @@ def package_edit(package_id: int):
         pkg.name = form.name.data.strip()
         pkg.description = (form.description.data or "").strip()
         pkg.price_tzs = form.price_tzs.data
+        pkg.token_cost = form.token_cost.data or 0
         pkg.duration_minutes = _minutes_from_package_form(form)
         pkg.sort_order = form.sort_order.data or 0
         pkg.is_active = bool(form.is_active.data)

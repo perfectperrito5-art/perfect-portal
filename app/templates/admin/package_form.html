@@ -7,6 +7,7 @@
   <label>Name {{ form.name() }}</label>
   <label>Description {{ form.description(rows=3) }}</label>
   <label>Price (TZS) {{ form.price_tzs() }}</label>
+  <label>Token cost {{ form.token_cost() }}<span class="muted">Used only in token purchasing mode.</span></label>
   <label>Duration
     <span class="duration-row">
       {{ form.duration_amount() }}

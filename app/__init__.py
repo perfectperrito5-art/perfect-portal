@@ -26,6 +26,7 @@ def create_app(config_object: type = Config) -> Flask:
     _register_blueprints(app)
     _register_context(app)
     _bootstrap_db(app)
+    _recover_interrupted_token_purchases(app)
     _start_session_janitor(app)
 
     return app
@@ -86,6 +87,8 @@ def _register_blueprints(app: Flask) -> None:
     @app.route("/ncsi.txt")
     @app.route("/connecttest.txt")
     @app.route("/success.txt")
+    @app.route("/portal-check")
+    @app.route("/redirect")
     def captive_probes():
         from flask import redirect, request, url_for
 
@@ -93,13 +96,13 @@ def _register_blueprints(app: Flask) -> None:
             ensure_gateway_access,
             find_active_session,
             lookup_mac_for_ip,
-            normalize_mac,
         )
 
-        ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(
-            ","
-        )[0].strip()
-        mac = normalize_mac(request.args.get("mac")) or lookup_mac_for_ip(ip)
+        # This endpoint is reached directly by captive clients. Do not trust
+        # X-Forwarded-For here: a client can spoof it and impersonate another
+        # device when no trusted reverse proxy is in front.
+        ip = (request.remote_addr or "").strip()
+        mac = lookup_mac_for_ip(ip)
         active = find_active_session(mac)
         if active:
             ensure_gateway_access(active)
@@ -112,7 +115,11 @@ def _register_blueprints(app: Flask) -> None:
                 return "Microsoft NCSI", 200, {"Content-Type": "text/plain"}
             return "", 204
 
-        return redirect(url_for("portal.home"))
+        # Use the canonical portal host instead of a captive-probe hostname.
+        # Relative redirects can leave the browser on connectivitycheck.*.
+        portal_base = (app.config.get("PORTAL_BASE_URL") or "").rstrip("/")
+        portal_url = f"{portal_base}{url_for('portal.home')}" if portal_base else url_for("portal.home")
+        return redirect(portal_url, code=302)
 
 
 def _register_context(app: Flask) -> None:
@@ -143,13 +150,30 @@ def _register_context(app: Flask) -> None:
 
 
 def _bootstrap_db(app: Flask) -> None:
-    from app.models import AdminUser, Package  # noqa: F401
+    from app.models import AdminUser, Package, TokenBundle, TokenPurchase, FreeTrialClaim, AwardRule, AwardGrant, PackagePurchaseAttempt  # noqa: F401
     from app.services.theme import ensure_defaults
 
     with app.app_context():
         db.create_all()
+        _migrate_payment_provider_columns(app)
+        # Bring customer identity schema forward without replacing existing records.
+        _migrate_customer_identity_columns(app)
+        # Add every column referenced by ORM queries before running data backfills.
+        _migrate_purchase_recovery_columns(app)
+        _migrate_token_columns(app)
         _migrate_session_unix_columns(app)
         ensure_defaults()
+        from app.models.settings import SiteSetting
+        if SiteSetting.query.filter_by(key="purchasing_mode").first() is None:
+            SiteSetting.set("purchasing_mode", "voucher_payment")
+        if TokenBundle.query.count() == 0:
+            db.session.add_all([
+                TokenBundle(name="Starter", price_tzs=500, token_amount=50, sort_order=1),
+                TokenBundle(name="Standard", price_tzs=1000, token_amount=100, sort_order=2),
+                TokenBundle(name="Plus", price_tzs=3000, token_amount=350, sort_order=3),
+                TokenBundle(name="Value", price_tzs=6000, token_amount=750, sort_order=4),
+            ])
+            db.session.commit()
 
         if not AdminUser.query.filter_by(username=app.config["ADMIN_USERNAME"]).first():
             admin = AdminUser(username=app.config["ADMIN_USERNAME"])
@@ -236,23 +260,152 @@ def _start_session_janitor(app: Flask) -> None:
     if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") == "false":
         return
 
+    # Expiry enforcement remains frequent; gateway reconciliation runs on a
+    # separate, slower cadence so firewall restarts or lost nft state recover.
+    expiry_interval = max(10, int(app.config.get("SESSION_JANITOR_INTERVAL", 30)))
+    gateway_interval = max(expiry_interval, int(app.config.get("GATEWAY_RECONCILE_INTERVAL", 300)))
+    state = {"last_gateway_sync": 0.0}
+
     def _tick():
+        import time
         with app.app_context():
             try:
-                from app.services.access import (
-                    revoke_expired_sessions,
-                    sync_active_sessions_to_gateway,
-                )
-
+                from app.services.access import revoke_expired_sessions
                 revoke_expired_sessions()
-                if app.config.get("GATEWAY_ENABLED"):
+                from app.services.tokens import recover_pending_package_purchases
+                recover_pending_package_purchases(limit=50)
+                now = time.monotonic()
+                if app.config.get("GATEWAY_ENABLED") and (
+                    not state["last_gateway_sync"]
+                    or now - state["last_gateway_sync"] >= gateway_interval
+                ):
+                    from app.services.access import sync_active_sessions_to_gateway
                     sync_active_sessions_to_gateway()
+                    state["last_gateway_sync"] = now
             except Exception:
+                # Keep the last successful sync timestamp unchanged so a
+                # failed reconciliation is retried on the next janitor tick.
                 app.logger.exception("Session janitor failed")
-        timer = threading.Timer(30.0, _tick)
+        timer = threading.Timer(expiry_interval, _tick)
         timer.daemon = True
         timer.start()
 
-    timer = threading.Timer(30.0, _tick)
+    timer = threading.Timer(expiry_interval, _tick)
     timer.daemon = True
     timer.start()
+
+def _migrate_customer_identity_columns(app: Flask) -> None:
+    """Add display-name support and enforce one device per customer where safe."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    tables = set(inspector.get_table_names())
+    if "customer_accounts" in tables:
+        columns = {column["name"] for column in inspector.get_columns("customer_accounts")}
+        if "display_name" not in columns:
+            with db.engine.begin() as connection:
+                connection.execute(text(
+                    "ALTER TABLE customer_accounts ADD COLUMN display_name VARCHAR(40) NOT NULL DEFAULT 'Guest'"
+                ))
+            app.logger.info("Added display_name to existing customer accounts.")
+
+    if "customer_devices" in tables:
+        with db.engine.begin() as connection:
+            duplicates = connection.execute(text(
+                "SELECT account_id FROM customer_devices GROUP BY account_id HAVING COUNT(*) > 1 LIMIT 1"
+            )).first()
+            if duplicates:
+                app.logger.warning(
+                    "One-device-per-customer unique index was not added: legacy duplicate device ownership exists."
+                )
+            else:
+                connection.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_device_one_per_account_idx ON customer_devices (account_id)"
+                ))
+
+    # Keep legacy rule/grant records for audit, but stop obsolete linked-device
+    # rules from being eligible for future rewards.
+    if "award_rules" in tables:
+        with db.engine.begin() as connection:
+            connection.execute(text(
+                "UPDATE award_rules SET is_active = 0 WHERE rule_type = 'device_count'"
+            ))
+
+
+def _migrate_token_columns(app: Flask) -> None:
+    """Add token pricing to existing package tables without resetting customer data."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "packages" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("packages")}
+    if "token_cost" not in columns:
+        with db.engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE packages ADD COLUMN token_cost INTEGER NOT NULL DEFAULT 0"
+            ))
+        app.logger.info("Added token_cost to existing packages table.")
+
+
+def _migrate_purchase_recovery_columns(app: Flask) -> None:
+    """Add the nullable session-to-purchase link to existing installations."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "access_sessions" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("access_sessions")}
+    if "purchase_attempt_id" not in columns:
+        with db.engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE access_sessions ADD COLUMN purchase_attempt_id INTEGER"
+            ))
+        app.logger.info("Added purchase_attempt_id to access_sessions.")
+
+
+def _recover_interrupted_token_purchases(app: Flask) -> None:
+    """Run one bounded recovery pass after the database is ready at startup."""
+    with app.app_context():
+        try:
+            from app.services.tokens import recover_pending_package_purchases
+            result = recover_pending_package_purchases(limit=100, force=True)
+            if any(result.values()):
+                app.logger.info("Recovered interrupted token purchases: %s", result)
+        except Exception:
+            app.logger.exception("Startup token-purchase recovery failed; janitor will retry.")
+
+
+def _migrate_payment_provider_columns(app: Flask) -> None:
+    """Rename legacy payment metadata columns without discarding existing records."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "payments" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("payments")}
+    renames = {
+        "selcom_reference": "provider_reference",
+        "selcom_result": "provider_result",
+        "selcom_message": "provider_message",
+        "raw_webhook": "provider_payload",
+    }
+    for old_name, new_name in renames.items():
+        if old_name in columns and new_name not in columns:
+            with db.engine.begin() as connection:
+                connection.execute(
+                    text(f'ALTER TABLE payments RENAME COLUMN "{old_name}" TO "{new_name}"')
+                )
+            columns.remove(old_name)
+            columns.add(new_name)
+            app.logger.info("Renamed legacy payment metadata column %s to %s.", old_name, new_name)
+        elif old_name in columns and new_name in columns:
+            # A partially migrated database may contain both. Preserve old values
+            # in the provider-neutral column; the legacy column is left untouched.
+            with db.engine.begin() as connection:
+                connection.execute(
+                    text(
+                        f'UPDATE payments SET "{new_name}" = COALESCE("{new_name}", "{old_name}")'
+                    )
+                )

@@ -8,6 +8,7 @@ import re
 import subprocess
 
 from datetime import datetime, timezone
+from sqlalchemy import and_, or_
 
 from flask import current_app
 
@@ -110,6 +111,7 @@ def grant_access(
     ip: str | None = None,
     voucher: Voucher | None = None,
     payment: Payment | None = None,
+    purchase_attempt_id: int | None = None,
 ) -> AccessSession:
     mac_n = normalize_mac(mac) or (mac or "UNKNOWN").upper()
     now = now_utc()
@@ -130,6 +132,7 @@ def grant_access(
         package_id=package.id,
         voucher_id=voucher.id if voucher else None,
         payment_id=payment.id if payment else None,
+        purchase_attempt_id=purchase_attempt_id,
         started_at=now,
         expires_at=expires,
         started_at_unix=started_unix,
@@ -139,6 +142,17 @@ def grant_access(
     )
     db.session.add(session)
     db.session.commit()
+
+    # Attach actual network-session activity to the matching customer account.
+    from app.models.customer import CustomerDevice, CustomerActivity
+    device = CustomerDevice.query.filter_by(mac_address=mac_n, is_active=True).first()
+    if device:
+        db.session.add(CustomerActivity(
+            account_id=device.account_id, device_id=device.id,
+            event_type="internet_session_started",
+            details=f"{package.name} · {package.duration_label()}",
+        ))
+        db.session.commit()
 
     if current_app.config.get("GATEWAY_ENABLED"):
         ok = run_gateway("authorize", mac_n, ip or "", str(duration_seconds))
@@ -157,6 +171,13 @@ def revoke_session(session: AccessSession, *, reason: str = "admin") -> bool:
     """Revoke DB session AND remove MAC from the live firewall allow-list."""
     session.revoked = True
     session.gateway_authorized = False
+    from app.models.customer import CustomerDevice, CustomerActivity
+    device = CustomerDevice.query.filter_by(mac_address=session.mac_address, is_active=True).first()
+    if device:
+        db.session.add(CustomerActivity(
+            account_id=device.account_id, device_id=device.id,
+            event_type="internet_session_ended", details=f"Session {session.id} revoked ({reason})",
+        ))
     db.session.commit()
 
     ok = True
@@ -175,7 +196,14 @@ def revoke_session(session: AccessSession, *, reason: str = "admin") -> bool:
 
 def revoke_expired_sessions() -> int:
     now = now_unix()
-    sessions = AccessSession.query.filter_by(revoked=False).all()
+    now_dt = datetime.now(timezone.utc)
+    sessions = AccessSession.query.filter(
+        AccessSession.revoked.is_(False),
+        or_(
+            AccessSession.expires_at_unix <= now,
+            and_(AccessSession.expires_at_unix.is_(None), AccessSession.expires_at <= now_dt),
+        ),
+    ).all()
     count = 0
     for s in sessions:
         if session_expires_unix(s) <= now:
