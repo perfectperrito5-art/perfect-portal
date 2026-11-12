@@ -163,6 +163,7 @@ def link_device_with_code(code: str, mac_address: str, ip_address: str = ""):
         )
         db.session.add(device)
 
+    db.session.flush()
     link.used_at = now
     db.session.add(CustomerActivity(
         account_id=account.id,
