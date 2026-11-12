@@ -35,5 +35,5 @@ Network addresses, subnet, and whether the radio is **this PC** or a **real AP**
 ## Notes
 
 - Change `SECRET_KEY` and the admin password before production.
-- Selcom online pay stays off until merchant keys and a public webhook exist. Vouchers are the live customer path.
+- AzamPay online checkout is configurable and remains off until merchant credentials and callback verification are configured. Voucher/direct-payment mode remains available.
 - A PowerPoint deck can be produced later from `docs/PROJECT.md`.

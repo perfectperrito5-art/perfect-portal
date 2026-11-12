@@ -1,4 +1,4 @@
-"""Payment orchestration: Selcom order + USSD push + fulfillment."""
+"""AzamPay checkout orchestration and payment fulfillment."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import logging
 import secrets
 from datetime import datetime, timezone
 
-from flask import current_app
 
 from app.extensions import db
 from app.models.package import Package
@@ -62,7 +61,7 @@ def start_mobile_payment(
     client = AzamPayClient.from_app()
 
     if not client.configured():
-        payment.selcom_message = (
+        payment.provider_message = (
             "AzamPay not configured — payment left pending (dev mode)."
         )
         db.session.commit()
@@ -81,7 +80,7 @@ def start_mobile_payment(
 
     if not provider:
         payment.status = "failed"
-        payment.selcom_message = (
+        payment.provider_message = (
             f"Unsupported mobile network: {network}"
         )
         db.session.commit()
@@ -97,22 +96,22 @@ def start_mobile_payment(
             provider=provider,
         )
 
-        payment.raw_webhook = dump_json(checkout_resp)
+        payment.provider_payload = dump_json(checkout_resp)
 
-        payment.selcom_reference = str(
+        payment.provider_reference = str(
             checkout_resp.get("reference")
             or checkout_resp.get("transactionId")
             or checkout_resp.get("transid")
             or ""
         )
 
-        payment.selcom_result = str(
+        payment.provider_result = str(
             checkout_resp.get("result")
             or checkout_resp.get("status")
             or ""
         )
 
-        payment.selcom_message = str(
+        payment.provider_message = str(
             checkout_resp.get("message")
             or ""
         )
@@ -121,8 +120,8 @@ def start_mobile_payment(
 
     except AzamPayError as exc:
         payment.status = "failed"
-        payment.selcom_message = str(exc)
-        payment.raw_webhook = dump_json(exc.payload)
+        payment.provider_message = str(exc)
+        payment.provider_payload = dump_json(exc.payload)
         db.session.commit()
         raise
 
@@ -161,55 +160,6 @@ def fulfill_payment(payment: Payment) -> None:
     logger.info("Payment fulfilled order=%s mac=%s", payment.order_id, payment.client_mac)
 
 
-def apply_webhook_payload(payload: dict) -> Payment | None:
-    order_id = (
-        payload.get("order_id")
-        or payload.get("orderId")
-        or (payload.get("data") or {}).get("order_id")
-    )
-    if not order_id and isinstance(payload.get("data"), list) and payload["data"]:
-        order_id = payload["data"][0].get("order_id")
-
-    # Some callbacks only carry transid / reference
-    transid = payload.get("transid") or payload.get("transaction_id")
-    payment = None
-    if order_id:
-        payment = Payment.query.filter_by(order_id=str(order_id)).first()
-    if payment is None and transid:
-        payment = Payment.query.filter_by(transid=str(transid)).first()
-    if payment is None:
-        logger.warning("Webhook for unknown payment: %s", payload)
-        return None
-
-    payment.raw_webhook = dump_json(payload)
-    payment.selcom_reference = str(
-        payload.get("reference") or payment.selcom_reference or ""
-    )
-    payment.selcom_result = str(payload.get("result") or "")
-    payment.selcom_message = str(payload.get("message") or "")
-    db.session.commit()
-
-    result = (payload.get("result") or "").upper()
-    resultcode = str(payload.get("resultcode") or "")
-    payment_status = str(payload.get("payment_status") or payload.get("status") or "").upper()
-
-    success = (
-        result in {"SUCCESS", "COMPLETED", "PAID"}
-        or payment_status in {"SUCCESS", "COMPLETED", "PAID"}
-        or resultcode in {"000", "0"}
-    )
-    failed = result in {"FAIL", "FAILED", "CANCELLED", "CANCELED"} or resultcode in {
-        "403",
-        "500",
-    }
-
-    if success:
-        fulfill_payment(payment)
-    elif failed:
-        payment.status = "failed"
-        db.session.commit()
-
-    return payment
 
 def apply_azampay_callback(payload: dict) -> Payment | None:
     """Process an AzamPay callback and fulfill the matching payment."""
@@ -241,19 +191,19 @@ def apply_azampay_callback(payload: dict) -> Payment | None:
         return None
 
     # Keep the complete callback for troubleshooting/auditing.
-    payment.raw_webhook = dump_json(payload)
+    payment.provider_payload = dump_json(payload)
 
-    payment.selcom_reference = str(
+    payment.provider_reference = str(
         payload.get("reference")
         or payload.get("utilityref")
         or payload.get("transid")
-        or payment.selcom_reference
+        or payment.provider_reference
         or ""
     )
 
-    payment.selcom_result = transaction_status
+    payment.provider_result = transaction_status
 
-    payment.selcom_message = str(
+    payment.provider_message = str(
         payload.get("message")
         or ""
     )

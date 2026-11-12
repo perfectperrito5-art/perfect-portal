@@ -57,7 +57,7 @@ It is **not** a replacement for an ISP, a mesh Wi‑Fi product, or a full hotel 
 5. They enter the voucher → **You’re connected**.  
 6. Internet stays on until the **package duration ends**, or an admin revokes the device.
 
-Online Selcom pay exists in the code but is **off by default** until merchant API access and a public webhook URL are ready. Vouchers are the live path.
+AzamPay online checkout is available but **off by default** until merchant credentials and callback verification are configured. Voucher/direct-payment mode remains available.
 
 ---
 
@@ -238,7 +238,7 @@ In place today:
 - Admin password hashing, CSRF on forms, rate limits  
 - Captive firewall until a MAC is authorized  
 - Secrets in `.env` (not for public git)  
-- Voucher codes; Selcom webhook designed to require a secret  
+- Voucher codes; AzamPay callback endpoint  
 
 Not a full enterprise NAC product. HTTPS for the portal is recommended once a certificate and public name exist. The current LAN hotspot is HTTP on the customer subnet.
 
@@ -279,10 +279,9 @@ English-only steps blocked some customers. Long package lists pushed instruction
 
 **Response:** short Kiswahili on the howto steps; packages scroll in a fixed area; howto + voucher button stay in a dock.
 
-### 10.5 Selcom
+### 10.5 Mobile-money checkout
 
-The documentation site is not the API. LAN `10.x` / `192.168.x` addresses are not reachable by Selcom’s servers. Merchant credentials and a **public webhook** are required before online pay can be switched on.
-
+AzamPay is the configured mobile-money provider. Merchant credentials and a publicly reachable callback endpoint are required before enabling online checkout.
 ### 10.6 Range
 
 A laptop Intel Wi‑Fi card as AP covers roughly one room well. A dedicated AP is the proper range upgrade; the software is already split so the radio can change.
@@ -300,7 +299,7 @@ The stack is **Linux**. Sending a `.rar` of the source to Windows is fine for re
 | One gateway PC | That machine must stay on |
 | Open or simple WPA hotspot | Captive UX is easier on open Wi‑Fi; WPA is optional in `ap.env` |
 | No per-user bandwidth cap yet | Time is sold, not megabytes |
-| Selcom not live | Voucher / attendant flow |
+| AzamPay checkout not configured | Voucher / attendant flow |
 | Presentation | PowerPoint can be produced from this document when needed |
 
 Reasonable later work: HTTPS, bandwidth packages, reseller vouchers, SMS receipts, dedicated AP hardware, and a business slide deck.

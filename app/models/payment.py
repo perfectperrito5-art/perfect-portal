@@ -16,10 +16,10 @@ class Payment(db.Model):
     # pending | success | failed | cancelled
     client_mac = db.Column(db.String(32), nullable=True)
     client_ip = db.Column(db.String(64), nullable=True)
-    selcom_reference = db.Column(db.String(64), nullable=True)
-    selcom_result = db.Column(db.String(64), nullable=True)
-    selcom_message = db.Column(db.String(500), nullable=True)
-    raw_webhook = db.Column(db.Text, nullable=True)
+    provider_reference = db.Column(db.String(64), nullable=True)
+    provider_result = db.Column(db.String(64), nullable=True)
+    provider_message = db.Column(db.String(500), nullable=True)
+    provider_payload = db.Column(db.Text, nullable=True)
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

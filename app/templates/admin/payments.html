@@ -2,7 +2,7 @@
 {% block title %}Payments{% endblock %}
 {% block content %}
 <h1>Payments</h1>
-<p class="lede">Selcom USSD push transactions. Mark paid only for verified offline settlements.</p>
+<p class="lede">Mobile-money payment transactions. Mark paid only for verified offline settlements.</p>
 <table>
   <thead>
     <tr><th>Order</th><th>Phone</th><th>Package</th><th>Amount</th><th>Status</th><th>Message</th><th></th></tr>
@@ -15,7 +15,7 @@
       <td>{{ p.package.name if p.package else '—' }}</td>
       <td>{{ '{:,}'.format(p.amount_tzs) }}</td>
       <td><span class="badge badge-{{ p.status }}">{{ p.status }}</span></td>
-      <td class="muted">{{ p.selcom_message or '—' }}</td>
+      <td class="muted">{{ p.provider_message or '—' }}</td>
       <td>
         {% if p.status != 'success' %}
         <form method="post" action="{{ url_for('admin.payment_mark_paid', payment_id=p.id) }}" onsubmit="return confirm('Grant access for this payment?');">

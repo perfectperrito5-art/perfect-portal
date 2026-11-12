@@ -4,11 +4,13 @@ from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
 from app import create_app
+from app import create_app, _migrate_payment_provider_columns
 from app.extensions import db
 from app.models.customer import CustomerAccount, CustomerDevice, WalletTransaction
 from app.models.settings import SiteSetting
 from app.services.customers import create_device_link_code, link_device_with_code
 from app.models.package import Package
+from app.models.payment import Payment
 from app.models.session import AccessSession
 from app.models.token import AwardRule, AwardGrant, FreeTrialClaim, PackagePurchaseAttempt
 from app.services.tokens import (
@@ -68,6 +70,45 @@ class TokenSafetyTests(unittest.TestCase):
         with self.app.app_context():
             db.session.remove()
             db.drop_all()
+
+    def test_payment_provider_column_migration_preserves_existing_values(self):
+        with self.app.app_context():
+            payment = Payment(
+                order_id="MIGRATION-ORDER",
+                transid="MIGRATION-TRANS",
+                package_id=self.package_id,
+                phone="255754000000",
+                amount_tzs=500,
+                status="pending",
+                provider_reference="legacy-reference",
+                provider_result="PENDING",
+                provider_message="legacy-message",
+                provider_payload='{"legacy": true}',
+            )
+            db.session.add(payment)
+            db.session.commit()
+
+            with db.engine.begin() as connection:
+                connection.exec_driver_sql(
+                    "ALTER TABLE payments RENAME COLUMN provider_reference TO selcom_reference"
+                )
+                connection.exec_driver_sql(
+                    "ALTER TABLE payments RENAME COLUMN provider_result TO selcom_result"
+                )
+                connection.exec_driver_sql(
+                    "ALTER TABLE payments RENAME COLUMN provider_message TO selcom_message"
+                )
+                connection.exec_driver_sql(
+                    "ALTER TABLE payments RENAME COLUMN provider_payload TO raw_webhook"
+                )
+
+            _migrate_payment_provider_columns(self.app)
+            db.session.expire_all()
+            migrated = Payment.query.filter_by(order_id="MIGRATION-ORDER").one()
+            self.assertEqual(migrated.provider_reference, "legacy-reference")
+            self.assertEqual(migrated.provider_result, "PENDING")
+            self.assertEqual(migrated.provider_message, "legacy-message")
+            self.assertEqual(migrated.provider_payload, '{"legacy": true}')
 
     def test_wallet_debit_is_atomic_and_rejects_insufficient_balance(self):
         with self.app.app_context():
