@@ -46,7 +46,7 @@ jobs:
           token_page = client.get("/?mac=AA:BB:CC:DD:EE:FF")
           assert token_page.status_code == 200, token_page.status_code
           assert b"Available Tokens" in token_page.data
-          assert b"Token Bundles" in token_page.data
+          assert b"TOKENS TOP-UP" in token_page.data
           with app.app_context():
               account = CustomerAccount.query.one()
               account.token_balance = 100
