@@ -130,7 +130,7 @@ class ThemeForm(FlaskForm):
     hero_subtitle = TextAreaField("Hero subtitle", validators=[Optional(), Length(max=400)])
     show_voucher_tab = BooleanField("Show voucher redeem on portal", default=True)
     show_online_pay = BooleanField(
-        "Show online Selcom pay (keep off until merchant access is ready)",
+        "Show online AzamPay (keep off until merchant access is ready)",
         default=False,
     )
     footer_text = StringField("Footer text", validators=[Optional(), Length(max=255)])
