@@ -155,6 +155,7 @@ def _bootstrap_db(app: Flask) -> None:
 
     with app.app_context():
         db.create_all()
+        _migrate_payment_provider_columns(app)
         # Bring customer identity schema forward without replacing existing records.
         _migrate_customer_identity_columns(app)
         # Add every column referenced by ORM queries before running data backfills.
@@ -373,3 +374,38 @@ def _recover_interrupted_token_purchases(app: Flask) -> None:
                 app.logger.info("Recovered interrupted token purchases: %s", result)
         except Exception:
             app.logger.exception("Startup token-purchase recovery failed; janitor will retry.")
+
+
+def _migrate_payment_provider_columns(app: Flask) -> None:
+    """Rename legacy payment metadata columns without discarding existing records."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "payments" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("payments")}
+    renames = {
+        "selcom_reference": "provider_reference",
+        "selcom_result": "provider_result",
+        "selcom_message": "provider_message",
+        "raw_webhook": "provider_payload",
+    }
+    for old_name, new_name in renames.items():
+        if old_name in columns and new_name not in columns:
+            with db.engine.begin() as connection:
+                connection.execute(
+                    text(f'ALTER TABLE payments RENAME COLUMN "{old_name}" TO "{new_name}"')
+                )
+            columns.remove(old_name)
+            columns.add(new_name)
+            app.logger.info("Renamed legacy payment metadata column %s to %s.", old_name, new_name)
+        elif old_name in columns and new_name in columns:
+            # A partially migrated database may contain both. Preserve old values
+            # in the provider-neutral column; the legacy column is left untouched.
+            with db.engine.begin() as connection:
+                connection.execute(
+                    text(
+                        f'UPDATE payments SET "{new_name}" = COALESCE("{new_name}", "{old_name}")'
+                    )
+                )
