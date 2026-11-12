@@ -33,7 +33,7 @@ from app.services.tokens import purchasing_mode, purchase_token_package, claim_d
 import re
 import secrets
 from app.services.phone import detect_network
-from app.services.selcom import SelcomError
+from app.services.azampay import AzamPayError
 
 
 def _portal_href(path: str = "/") -> str:
@@ -324,7 +324,7 @@ def pay():
     except ValueError as exc:
         flash(str(exc), "warning")
         return redirect(url_for("portal.home"))
-    except SelcomError as exc:
+    except AzamPayError as exc:
         flash(str(exc), "danger")
         return redirect(url_for("portal.home"))
 
